@@ -26,5 +26,27 @@ https://colab.research.google.com/github/huggingface/notebooks/blob/main/example
     train_dataset=tokenized_datasets["train"].select(range(2000)),
     eval_dataset=tokenized_datasets["validation"].select(range(500)),
 
+https://stackoverflow.com/a/48947404
 
+ conda env list
+# conda environments:
+#
+base                  *  /home/vente/.conda
+tf                       /home/vente/.conda/envs/tf
+torch                    /home/vente/.conda/envs/torch
     
+conda create --name ngls --clone torch
+conda activate ngls
+
+https://stackoverflow.com/questions/41274007/anaconda-export-environment-file
+
+https://stackoverflow.com/a/59456960
+
+ conda env export > env.yaml
+
+
+ pip install datasets evaluate transformers rouge-score nltk sentencepiece
+
+
+
+ huggingface-cli login
