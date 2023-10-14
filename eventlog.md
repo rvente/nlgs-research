@@ -50,3 +50,21 @@ https://stackoverflow.com/a/59456960
 
 
  huggingface-cli login
+
+
+ As of f452504 on 9 Oct, first test finetuning is underway but on a different summarization task, using the xsum dataset.
+
+ Next step is to inspect the existing webnlg dataset on hugging face and then figuring out how to create my own.
+
+|   Step   | Training Loss | Validation Loss | Rouge1   | Rouge2   | Rougel  | Rougelsum | Gen Len   |
+|:--------:|:-------------:|:---------------:|:--------:|:--------:|:-------:|:---------:|:---------:|
+|  2000    |   2.814100    |     2.560796    | 26.772300 | 6.755400 | 20.918600 | 20.911200  | 18.814300 |
+|  4000    |   2.781000    |     2.522533    | 27.531000 | 7.227500 | 21.592400 | 21.588700  | 18.840200 |
+
+
+as of a42f888 on 14 October, summarization is underway for the text to data subtask
+
+|   Step   | Training Loss | Validation Loss | Rouge1   | Rouge2   | Rougel  | Rougelsum | Gen Len   |
+|:--------:|:-------------:|:---------------:|:--------:|:--------:|:-------:|:---------:|:---------:|
+|  2000    |   0.787000    |     0.486647    | 52.231400 | 38.483700 | 48.844900 | 48.861900  | 18.172300 |
+|  4000    |   0.543000    |     0.335245    | 54.225600 | 43.192300 | 51.581900 | 51.527400  | 18.126600 |
