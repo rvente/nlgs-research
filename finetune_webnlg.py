@@ -23,8 +23,6 @@ fst_samp
 # TODO: Cursor here - work from here! Need to update references to the "document" and "summary"
 # as a hack, I could add my input and target to there, just toget it all working
 # then properly sub it in.
-fill_summary_and_document(fst_samp)
-fst_samp
 
 # %%
 def fill_summary_and_document(training_sample):
@@ -36,6 +34,8 @@ def fill_summary_and_document(training_sample):
     return sp
 
 # %%
+fill_summary_and_document(fst_samp)
+fst_samp
 # %%
 doc_sum_datasets = raw_datasets.map(fill_summary_and_document)
 
@@ -199,3 +199,21 @@ trainer.predict(tokenized_datasets['test'])
 # 
 # model = AutoModelForSeq2SeqLM.from_pretrained("sgugger/my-awesome-model")
 # ```
+# %%
+def text_to_prediction_single(text):
+    tokens = tokenizer(text, return_tensors='pt').to(device)
+    print(tokens)
+    output = trainer.model(
+        inputs_embeds=tokens.input_ids,
+        attention_mask=tokens.attention_mask,
+        decoder_inputs_embeds=tokens.input_ids)
+    # print(output)
+    # return tokenizer.decode(output)
+
+t = "The FitnessGram Pacer Test is a multistage aerobic capacity test that progressively gets more difficult as it continues. The 20 meter pacer test will begin in 30 seconds. Line up at the start. The running speed starts slowly, but gets faster each minute after you hear this signal."
+text_to_prediction_single(t)
+# %%
+# %%
+t = "The leader of Aarhus is Jacob Bundsgaard."
+tokenizer.decode(trainer.predict([tokenizer(t)]).predictions[0])
+# %%
