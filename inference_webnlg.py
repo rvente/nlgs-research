@@ -11,30 +11,21 @@ print(transformers.__version__)
 model_checkpoint = "t5-small"
 # %%
 from datasets import load_dataset
-from evaluate import load, combine
+from evaluate import load
 
 raw_datasets = load_dataset("web_nlg", "release_v2")
-metric = combine([
-    load("rouge"),
-    load("bleu")
-])
-raw_datasets
-# %%
-fst_samp = raw_datasets["train"][0]
-fst_samp
+metric = load("rouge")
 
+raw_datasets
 # %%
 def fill_summary_and_document(training_sample):
     sp = dict(training_sample)
-    sentences = "\n ".join(training_sample["lex"]['text'])
-    data = "\n ".join(training_sample['modified_triple_sets']['mtriple_set'][0])
-    sp["input"] = data
-    sp["output"] = sentences
+    document = "\n ".join(training_sample["lex"]['text'])
+    summary = "\n ".join(training_sample['modified_triple_sets']['mtriple_set'][0])
+    sp["document"] = document
+    sp["summary"] = summary
     return sp
 
-# %%
-fill_summary_and_document(fst_samp)
-fst_samp
 # %%
 doc_sum_datasets = raw_datasets.map(fill_summary_and_document)
 
@@ -44,30 +35,8 @@ import random
 import pandas as pd
 from IPython.display import display, HTML
 
-def show_random_elements(dataset, num_examples=5):
-    assert num_examples <= len(dataset), "Can't pick more elements than there are in the dataset."
-    picks = []
-    for _ in range(num_examples):
-        pick = random.randint(0, len(dataset)-1)
-        while pick in picks:
-            pick = random.randint(0, len(dataset)-1)
-        picks.append(pick)
-
-    df = pd.DataFrame(dataset[picks])
-    for column, typ in dataset.features.items():
-        if isinstance(typ, datasets.ClassLabel):
-            df[column] = df[column].transform(lambda i: typ.names[i])
-    display(HTML(df[["modified_triple_sets", 'lex']].to_html()))
-
-# %%
-show_random_elements(raw_datasets["train"])
 # %%
 metric
-# %%
-fake_preds = ["hello there", "general kenobi"]
-fake_labels = ["hello there", "general kenobi"]
-metric.compute(predictions=fake_preds, references=fake_labels)
-
 # %%
 from transformers import AutoTokenizer
 
@@ -87,11 +56,11 @@ max_input_length = 1024
 max_target_length = 128
 
 def preprocess_function(examples):
-    inputs = [prefix + doc for doc in examples["input"]]
+    inputs = [prefix + doc for doc in examples["document"]]
     model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True)
 
     # Setup the tokenizer for targets
-    labels = tokenizer(text_target=examples["output"], max_length=max_target_length, truncation=True)
+    labels = tokenizer(text_target=examples["summary"], max_length=max_target_length, truncation=True)
 
     model_inputs["labels"] = labels["input_ids"]
     return model_inputs
@@ -118,19 +87,18 @@ model = model.to(device)
 batch_size = 16
 model_name = model_checkpoint.split("/")[-1]
 args = Seq2SeqTrainingArguments(
-    f"{model_name}-finetuned-webnlg-d2s",
-    eval_steps=5000,
+    f"{model_name}-finetuned-webnlg",
+    eval_steps=2000,
     evaluation_strategy = "steps",
     learning_rate=2e-5,
     per_device_train_batch_size=batch_size,
     per_device_eval_batch_size=batch_size,
     weight_decay=0.01,
     save_total_limit=3,
-    num_train_epochs=100,
+    num_train_epochs=10,
     predict_with_generate=True,
     fp16=True,
     push_to_hub=True,
-    save_steps=1000,
 )
 
 # %%
@@ -156,20 +124,15 @@ def compute_metrics(eval_pred):
     # Note that other metrics may not have a `use_aggregator` parameter
     # and thus will return a list, computing a metric for each sentence.
     result = metric.compute(predictions=decoded_preds, references=decoded_labels, use_stemmer=True, use_aggregator=True)
-
-    # TODO: checkme
-    bertscore = load("bertscore")
-    bscore = {
-        ("bertscore"+k):
-        (np.mean(v) if not isinstance(v, str) else v)
-        for k,v in bertscore.compute(predictions=decoded_preds, references=decoded_labels, lang='en').items()
-    }
+    # Extract a few results
+    result = {key: value * 100 for key, value in result.items()}
 
     # Add mean generated length
     prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in predictions]
     result["gen_len"] = np.mean(prediction_lens)
 
-    return {**result, **bscore}
+
+    return {k: round(v, 4) for k, v in result.items()}
 
 # %%
 trainer = Seq2SeqTrainer(
@@ -183,12 +146,8 @@ trainer = Seq2SeqTrainer(
 )
 
 # %%
-trainer.train(resume_from_checkpoint=True)
-# trainer.train()
-trainer.save_metrics()
-# %%
-predictions = trainer.predict(tokenized_datasets['test'])
-predictions
+trainer.predict(tokenized_datasets['test'])
+
 # %%
 def text_to_prediction_single(text):
     return tokenizer.decode(trainer.predict([tokenizer(text)]).predictions[0])
