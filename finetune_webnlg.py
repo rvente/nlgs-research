@@ -104,6 +104,8 @@ def preprocess_function(examples):
 
 preprocess_function(doc_sum_datasets['train'][:2])
 
+# TODO: figure out what the target length should be and if it's actually training on the right data
+# https://huggingface.co/docs/transformers/v4.29.1/en/tasks/translation#translation
 
 # %%
 tokenized_datasets = doc_sum_datasets.map(preprocess_function, batched=True)
@@ -118,14 +120,25 @@ model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
 model = model.to(device)
 
 # %%
-generation_config = GenerationConfig(max_new_tokens=100, do_sample=True, eos_token_id=model.config.eos_token_id)
+# generation_config = GenerationConfig(max_new_tokens=100, do_sample=True, eos_token_id=model.config.eos_token_id, bos_token_id=model.config.bos_token_id)
+generation_config = GenerationConfig.from_pretrained("t5-small")
+generation_config.min_length = 40
+generation_config.max_length = 2048
+generation_config.early_stopping = True
+generation_config.pad_token_id
+
+
+# right now it's saying that the tokenizer doens't like the output
+# of the decode...
+# out of range integral type conversion attempted
+# https://github.com/huggingface/transformers/issues/22634
 
 # %%
 batch_size = 32
 model_name = model_checkpoint.split("/")[-1]
 args = Seq2SeqTrainingArguments(
     f"{model_name}-finetuned-webnlg-d2s-1e-4",
-    eval_steps=500,
+    eval_steps=600,
     generation_config=generation_config,
     evaluation_strategy = "steps",
     learning_rate=2e-4,
@@ -137,7 +150,9 @@ args = Seq2SeqTrainingArguments(
     predict_with_generate=True,
     fp16=True,
     push_to_hub=False,
-    save_steps=5000,
+    save_steps=500,
+    generation_max_length=2048,
+    generation_num_beams=4,
 )
 
 # %%
@@ -152,6 +167,8 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
+    print(predictions)
+    predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     # Replace -100 in the labels as we can't decode them.
     labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
@@ -163,7 +180,7 @@ def compute_metrics(eval_pred):
 
     # Note that other metrics may not have a `use_aggregator` parameter
     # and thus will return a list, computing a metric for each sentence.
-    result = metric.compute(predictions=decoded_preds, references=decoded_labels, use_stemmer=True, use_aggregator=True)
+    result = metric.compute(predictions=decoded_preds, references=decoded_labels)#, use_stemmer=True, use_aggregator=True)
 
     # Add mean generated length
     prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in predictions]
@@ -194,7 +211,7 @@ trainer = Seq2SeqTrainer(
     eval_dataset=tokenized_datasets["dev"],
     data_collator=data_collator,
     tokenizer=tokenizer,
-    compute_metrics=compute_metrics
+    compute_metrics=compute_metrics,
 )
 
 # %%
@@ -222,10 +239,10 @@ tokenizer.decode(trainer.predict([tokenizer(t)]).predictions[0])
 text_to_prediction_single("Torvalds was born in Helsinki, Finland,"
                           "the son of journalists Anna and Nils Torvalds")
 # %%
-" ".join(map(text_to_prediction_single, [
+print("\n".join(map(text_to_prediction_single, [
     "United_States | leaderName | Barack_Obama",
     "'Anderson,_Indiana | isPartOf | Fall_Creek_Township,_Madison_County,_Indiana', 'Fall_Creek_Township,_Madison_County,_Indiana | country | United_States', 'Anderson,_Indiana | isPartOf | Indiana'"
-]))
+])))
 # %%
 
 print("\n".join(map(tokenizer.decode,predictions.predictions)))
