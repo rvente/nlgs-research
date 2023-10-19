@@ -1,8 +1,10 @@
 # %%
 from huggingface_hub import notebook_login
+import torch
+assert torch.cuda.is_available()
 
 notebook_login()
-
+NUM_TRAIN_EPOCHS = 10
 # %%
 import transformers
 
@@ -26,15 +28,18 @@ fst_samp
 # %%
 def fill_summary_and_document(training_sample):
     sp = dict(training_sample)
-    sentences = "\n ".join(training_sample["lex"]['text'])
-    data = "\n ".join(training_sample['modified_triple_sets']['mtriple_set'][0])
-    sp["input"] = data
-    sp["output"] = sentences
+    sentences = " ".join(training_sample["lex"]['text'])
+    data = " ".join(training_sample['modified_triple_sets']['mtriple_set'][0])
+    sp["document"] = data.replace("|", " ").replace("  ", " ")
+    sp["summary"] = sentences
+    del sp['category']
+    del sp['lex']
+    del sp['original_triple_sets']
+    del sp['modified_triple_sets']
     return sp
 
 # %%
 fill_summary_and_document(fst_samp)
-fst_samp
 # %%
 doc_sum_datasets = raw_datasets.map(fill_summary_and_document)
 
@@ -64,9 +69,9 @@ show_random_elements(raw_datasets["train"])
 # %%
 metric
 # %%
-fake_preds = ["hello there", "general kenobi"]
-fake_labels = ["hello there", "general kenobi"]
-metric.compute(predictions=fake_preds, references=fake_labels)
+# fake_preds = ["hello there", "general kenobi"]
+# fake_labels = ["hello there", "general kenobi"]
+# metric.compute(predictions=fake_preds, references=fake_labels)
 
 # %%
 from transformers import AutoTokenizer
@@ -83,15 +88,15 @@ if model_checkpoint in ["t5-small", "t5-base", "t5-larg", "t5-3b", "t5-11b"]:
 else:
     prefix = ""
 # %%
-max_input_length = 1024
-max_target_length = 128
+max_input_length = 256
+max_target_length = 512
 
 def preprocess_function(examples):
-    inputs = [prefix + doc for doc in examples["input"]]
+    inputs = [prefix + doc for doc in examples["document"]]
     model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True)
 
     # Setup the tokenizer for targets
-    labels = tokenizer(text_target=examples["output"], max_length=max_target_length, truncation=True)
+    labels = tokenizer(text_target=examples["summary"], max_length=max_target_length, truncation=True)
 
     model_inputs["labels"] = labels["input_ids"]
     return model_inputs
@@ -107,30 +112,32 @@ tokenized_datasets = doc_sum_datasets.map(preprocess_function, batched=True)
 import torch
 
 # %%
-from transformers import AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, Seq2SeqTrainingArguments, Seq2SeqTrainer
+from transformers import AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, Seq2SeqTrainingArguments, Seq2SeqTrainer, GenerationConfig
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
 model = model.to(device)
 
 # %%
+generation_config = GenerationConfig(max_new_tokens=100, do_sample=True, eos_token_id=model.config.eos_token_id)
 
 # %%
-batch_size = 16
+batch_size = 32
 model_name = model_checkpoint.split("/")[-1]
 args = Seq2SeqTrainingArguments(
-    f"{model_name}-finetuned-webnlg-d2s",
-    eval_steps=5000,
+    f"{model_name}-finetuned-webnlg-d2s-1e-4",
+    eval_steps=500,
+    generation_config=generation_config,
     evaluation_strategy = "steps",
-    learning_rate=2e-5,
+    learning_rate=2e-4,
     per_device_train_batch_size=batch_size,
     per_device_eval_batch_size=batch_size,
     weight_decay=0.01,
     save_total_limit=3,
-    num_train_epochs=100,
+    num_train_epochs=NUM_TRAIN_EPOCHS,
     predict_with_generate=True,
     fp16=True,
-    push_to_hub=True,
-    save_steps=1000,
+    push_to_hub=False,
+    save_steps=5000,
 )
 
 # %%
@@ -140,6 +147,7 @@ data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 import nltk
 import numpy as np
 import os
+from pathlib import Path
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 def compute_metrics(eval_pred):
@@ -157,19 +165,26 @@ def compute_metrics(eval_pred):
     # and thus will return a list, computing a metric for each sentence.
     result = metric.compute(predictions=decoded_preds, references=decoded_labels, use_stemmer=True, use_aggregator=True)
 
-    # TODO: checkme
-    bertscore = load("bertscore")
-    bscore = {
-        ("bertscore"+k):
-        (np.mean(v) if not isinstance(v, str) else v)
-        for k,v in bertscore.compute(predictions=decoded_preds, references=decoded_labels, lang='en').items()
-    }
-
     # Add mean generated length
     prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in predictions]
     result["gen_len"] = np.mean(prediction_lens)
 
-    return {**result, **bscore}
+    # TODO: checkme
+    # bertscore = load("bertscore")
+    # bscore = {
+    #     ("bertscore"+k):
+    #     (np.mean(v) if not isinstance(v, str) else v)
+    #     for k,v in bertscore.compute(predictions=decoded_preds, references=decoded_labels, lang='en').items()
+    # }
+
+    # ret = {**result, **bscore}
+    ret = result
+    print(ret)
+    p = Path("snapshots/metrics")
+    t = p.read_text()
+    p.write_text(t + "\n" + str(ret))
+    
+    return ret
 
 # %%
 trainer = Seq2SeqTrainer(
@@ -183,9 +198,14 @@ trainer = Seq2SeqTrainer(
 )
 
 # %%
-trainer.train(resume_from_checkpoint=True)
-# trainer.train()
-trainer.save_metrics()
+try:
+    trainer.train(resume_from_checkpoint=True)
+except Exception as e:
+    print(e)
+    trainer.train()
+# %%
+predictions = trainer.predict(tokenized_datasets['dev'])
+print(predictions)
 # %%
 predictions = trainer.predict(tokenized_datasets['test'])
 predictions
@@ -193,8 +213,6 @@ predictions
 def text_to_prediction_single(text):
     return tokenizer.decode(trainer.predict([tokenizer(text)]).predictions[0])
 
-t = "The FitnessGram Pacer Test is a multistage aerobic capacity test that progressively gets more difficult as it continues. The 20 meter pacer test will begin in 30 seconds. Line up at the start. The running speed starts slowly, but gets faster each minute after you hear this signal."
-text_to_prediction_single(t)
 # %%
 # %%
 t = "The leader of Aarhus is Jacob Bundsgaard."
@@ -204,3 +222,14 @@ tokenizer.decode(trainer.predict([tokenizer(t)]).predictions[0])
 text_to_prediction_single("Torvalds was born in Helsinki, Finland,"
                           "the son of journalists Anna and Nils Torvalds")
 # %%
+" ".join(map(text_to_prediction_single, [
+    "United_States | leaderName | Barack_Obama",
+    "'Anderson,_Indiana | isPartOf | Fall_Creek_Township,_Madison_County,_Indiana', 'Fall_Creek_Township,_Madison_County,_Indiana | country | United_States', 'Anderson,_Indiana | isPartOf | Indiana'"
+]))
+# %%
+
+print("\n".join(map(tokenizer.decode,predictions.predictions)))
+# %%
+# %%
+max(map(len, predictions.predictions))
+# %% so it must be a count in characters, not tokens. Good to know.

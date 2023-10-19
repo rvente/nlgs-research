@@ -74,3 +74,32 @@ as of a42f888 on 14 October, summarization is underway for the text to data subt
 
 still need a way to emit predictions so that bertscore may be computed
 still need to validate that the output is correct
+
+I did that. It works!
+
+
+now I need to figure out the parameters to pass into the model. Learning rate and decay. 
+
+
+Training with 2e-5 for 100 epochs gave the following results in about 4.5 hours
+
+'rouge1': 0.426801639515604, 'rouge2': 0.3368091317409858, 'rougeL': 0.3959538960945993, 'rougeLsum': 0.4093016460133704, 'bleu': 0.029955359605418112, 'precisions': [0.9017084632614519, 0.7314420803782505, 0.591418770160258, 0.480850826261724], 'brevity_penalty': 0.045518364365731145, 'length_ratio': 0.2445203346327738, 'translation_length': 22769, 'reference_length': 93117, 'gen_len': 18.927733168622606, 'bertscoreprecision': 0.9191489429515111, 'bertscorerecall': 0.8748397045182622, 'bertscoref1': 0.8961523412700934, 'bertscorehashcode': 'roberta-large_L17_no-idf_version=0.3.12(hug_trans=4.24.0)'}
+
+I changed to 2e-4 and doubled the batch size
+
+
+pip install ipywidgets
+
+
+I had to refresh my conda env and build it from scratch https://anaconda.org/anaconda/cudatoolkit
+conda install -c anaconda cudatoolkit
+
+
+I should have made a back up of the environment before deleting it...
+good thing I have a backup of my base env
+
+pip install -r base_requirements.txt
+
+python3 -c "import torch; print(torch.cuda.is_available()); print(torch.__version__)"
+
+We're back in business.
