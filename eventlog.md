@@ -142,3 +142,7 @@ https://huggingface.co/docs/datasets/v2.15.0/en/package_reference/main_classes#d
 the data is normalized. 
 
 now I want to define the different subsets from the data as reversed elements for the hybrid model and save that. Later I will need to subset to non-hybrid use-cases
+
+
+Now finetine.py is great. I will find a subset that the model performs particularly badly on, and generate synthetic data with that subset in mind.
+

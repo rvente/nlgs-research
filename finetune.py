@@ -22,30 +22,22 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 assert torch.cuda.is_available()
 
 # notebook_login()
-NUM_TRAIN_EPOCHS = 10
+NUM_TRAIN_EPOCHS = 5
 TASK = 'd2s'
 model_checkpoint = "t5-small"
+
 NATURAL_LANGUAGE = "nl"
 STRUCTURED_DATA = "sd"
 
-TARGET = STRUCTURED_DATA if TASK == 'd2s' else NATURAL_LANGUAGE
-INPUT = NATURAL_LANGUAGE if TASK == 'd2s' else STRUCTURED_DATA
+TARGET = NATURAL_LANGUAGE if TASK == 'd2s' else STRUCTURED_DATA 
+INPUT = STRUCTURED_DATA if TASK == 'd2s' else NATURAL_LANGUAGE 
 assert TARGET != INPUT
 # %%
 # %%
+# TODO: for the multimodal one, add another pkl file here
 df = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
 df
 # %%
-
-metric = combine([
-    load("rouge"),
-    load("bleu"),
-    load('meteor'),
-])
-# %%
-df
-# %%
-metric
 # %%
 
 # %%
@@ -54,27 +46,17 @@ tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 # %%
 max_input_length = 256
 max_target_length = 256
-
-def preprocess_function(examples):
-    inputs = examples["document"]
-    model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True)
-
-    # Setup the tokenizer for targets
-    labels = tokenizer(text_target=examples["summary"], max_length=max_target_length, truncation=True)
-
-    model_inputs["label"] = labels["input_ids"]
-    return model_inputs
-
 tokenize = lambda x: tokenizer(x, max_length = max_input_length, truncation=True, padding=True)
 tokenized = tokenize(list(df[INPUT].values))
 # %%
+# [markdown]
+# The following fields comprise the "interface" of the model, despite the fact
+# the documentation doesn't make this obvious. 
 # %%
+
 df['input_ids'] = tokenized['input_ids']
 df['attention_mask'] = tokenized['attention_mask']
-df['label'] = df[TARGET].map(tokenize).map(lambda x: x['input_ids'])
-
-# TODO: figure out what the target length should be and if it's actually training on the right data
-# https://huggingface.co/docs/transformers/v4.29.1/en/tasks/translation#translation
+df['labels'] = df[TARGET].map(tokenize).map(lambda x: x['input_ids'])
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
@@ -88,15 +70,12 @@ generation_config.early_stopping = True
 generation_config.no_repeat_ngram_size = 5
 generation_config.temperature = .9
 
-
-
 # %%
-batch_size = 16
+batch_size = 32 if model_name == "t5-small" else 16
 model_name = model_checkpoint.split("/")[-1]
 args = Seq2SeqTrainingArguments(
     f"models/{model_name}-finetuned-webnlg-{TASK}-2e-4",
-    eval_steps=500,
-    generation_config=generation_config,
+    eval_steps=1000,
     evaluation_strategy = "steps",
     learning_rate=2e-4,
     per_device_train_batch_size=batch_size,
@@ -108,13 +87,24 @@ args = Seq2SeqTrainingArguments(
     fp16=True,
     push_to_hub=False,
     save_steps=600,
+    generation_config=generation_config,
     generation_max_length=2048,
     generation_num_beams=4,
+    # generation_no_repeat
 )
 
 # %%
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
+
+# %%
+metric = combine([
+    load("rouge"),
+    # load("bleu"),
+    # load('meteor'),
+])
+# %%
+metric
 # %%
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
@@ -149,39 +139,45 @@ def compute_metrics(eval_pred):
 df['input_ids'].map(len)
 # %%
 def pd_to_dataset(df: pd.DataFrame, split='train') -> Dataset:
-    d = Dataset.from_pandas(df[df.subset== split ][['input_ids','attention_mask','label']], split=split)
+    d = Dataset.from_pandas(df[df.subset== split ][['input_ids','attention_mask','labels']], split=split)
     return d.remove_columns("__index_level_0__")
 pd_to_dataset(df, 'train')
 # %%
-model(np.array([1, 2]))
 # %%
 trainer = Seq2SeqTrainer(
     model,
     args,
-    train_dataset=pd_to_dataset(df, 'train')['input_ids'],
-    eval_dataset=pd_to_dataset(df, 'test')['label'],
+    train_dataset=pd_to_dataset(df, 'train'),
+    eval_dataset=pd_to_dataset(df, 'test'),
     data_collator=data_collator,
     tokenizer=tokenizer,
     compute_metrics=compute_metrics,
 )
 
 # %%
+# we try-catch because resume_from_checkpoint returns a value error?!
+# if training did not begin first.
 try:
     trainer.train(resume_from_checkpoint=True)
 except ValueError as e:
     trainer.train()
 
 # %%
-predictions = trainer.predict(tokenized_datasets['dev'])
-print(predictions)
-# %%
-predictions = trainer.predict(tokenized_datasets['test'])
+predictions = trainer.predict(pd_to_dataset(df,'test'))
 predictions
 # %%
 def text_to_prediction_single(text):
     return tokenizer.decode(trainer.predict([tokenizer(text)]).predictions[0])
 
 # %%
+pred_df = pd.DataFrame(columns=['pred_ids'], data=pd.Series(list(predictions.predictions)))
+pred_df['decoded'] = pred_df.pred_ids.map(lambda x: [e for e in x if e > 1]).map(tokenizer.decode)
+pred_df['subset'] = 'test'
+
+pred_df = pred_df.reset_index()
+pred_df
+# %%
+pred_df.to_pickle(f"~/repos/nlgs-research/pipeline/predictions/{TASK}-{model_name}-{NUM_TRAIN_EPOCHS}.pkl")
 # %%
 t = "The leader of Aarhus is Jacob Bundsgaard."
 tokenizer.decode(trainer.predict([tokenizer(t)]).predictions[0])
@@ -204,22 +200,4 @@ print("\n".join(map(tokenizer.decode,
 max(map(len, predictions.predictions))
 # %%
 predictions.predictions
-# %%
-test_predictions = pd.DataFrame(tokenized_datasets['test'])
-prediction_ids = pd.Series(list(predictions.predictions))
-test_predictions['predicted'] = (prediction_ids
-        .map(list)
-        .map(lambda x: [a for a in x if a != -100 and a != 0])
-        .map(tokenizer.decode)
-)
-rouge = load('rouge')
-# %%
-test_predictions['rouge'] = (
-    (test_predictions['predicted'].map(lambda x: [x]) + test_predictions['summary'].map(lambda x: [x]))
-    .map(lambda x: rouge.compute(references=[x[0]], predictions=[x[1]], use_stemmer=False, use_aggregator=False, rouge_types=['rouge2']))
-    .map(lambda x: x['rouge2'][0])
-)
-                
-# %%
-# test_predictions['rouge'] = rouge.compute(predictions=test_predictions['predicted'], references=test_predictions['summary'])
 # %%
