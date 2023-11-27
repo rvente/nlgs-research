@@ -103,3 +103,42 @@ pip install -r base_requirements.txt
 python3 -c "import torch; print(torch.cuda.is_available()); print(torch.__version__)"
 
 We're back in business.
+
+...
+right now it's saying that the tokenizer doens't like the output
+of the decode...
+
+out of range integral type conversion attempted
+https://github.com/huggingface/transformers/issues/22634
+
+so I filtered out the -100 tokens
+
+from the prediction
+
+
+Found a bug! I have to take one and only one of the sentences?
+Or evaluate BLEU score properly with all alternatives.
+
+
+
+42,567 Characters	$0.02
+ 
+
+Curiosity: error analysis - is the model robust to label occurences or does it generalize?
+
+Checklist
+
+- normalize the data
+- create evaluation code for palm... wait I should already have some code I could re-use for that use-case...
+- Extract the wikibio segments and get them labeled
+    - de
+
+
+For my memory fragmentation issue:
+
+https://huggingface.co/docs/datasets/v2.15.0/en/package_reference/main_classes#datasets.Dataset.from_generator.keep_in_memory
+
+
+the data is normalized. 
+
+now I want to define the different subsets from the data as reversed elements for the hybrid model and save that. Later I will need to subset to non-hybrid use-cases

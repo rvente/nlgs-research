@@ -3,8 +3,9 @@ from huggingface_hub import notebook_login
 import torch
 assert torch.cuda.is_available()
 
-notebook_login()
+# notebook_login()
 NUM_TRAIN_EPOCHS = 10
+TASK = 'd2s'
 # %%
 import transformers
 
@@ -18,7 +19,8 @@ from evaluate import load, combine
 raw_datasets = load_dataset("web_nlg", "release_v2")
 metric = combine([
     load("rouge"),
-    load("bleu")
+    load("bleu"),
+    load('meteor'),
 ])
 raw_datasets
 # %%
@@ -30,14 +32,20 @@ def fill_summary_and_document(training_sample):
     sp = dict(training_sample)
     sentences = " ".join(training_sample["lex"]['text'])
     data = " ".join(training_sample['modified_triple_sets']['mtriple_set'][0])
-    sp["document"] = data.replace("|", " ").replace("  ", " ")
-    sp["summary"] = sentences
+
+    # Data to sentence
+    # sp["document"] = data
+    # sp["summary"] = sentences
+
+    # sentence to data
+    sp["document"] = sentences
+    sp["summary"] = data
+
     del sp['category']
     del sp['lex']
     del sp['original_triple_sets']
     del sp['modified_triple_sets']
     return sp
-
 # %%
 fill_summary_and_document(fst_samp)
 # %%
@@ -78,18 +86,14 @@ from transformers import AutoTokenizer
 
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
-tokenizer("Hello, this one sentence!")
 # %%
-tokenizer(["Hello, this one sentence!", "This is another sentence."])
-print(tokenizer(text_target=["Hello, this one sentence!", "This is another sentence."]))
-# %%
-if model_checkpoint in ["t5-small", "t5-base", "t5-larg", "t5-3b", "t5-11b"]:
+if model_checkpoint in ["t5-small", "t5-base", "t5-large", "t5-3b", "t5-11b"]:
     prefix = "summarize: "
 else:
     prefix = ""
 # %%
 max_input_length = 256
-max_target_length = 512
+max_target_length = 256
 
 def preprocess_function(examples):
     inputs = [prefix + doc for doc in examples["document"]]
@@ -98,7 +102,7 @@ def preprocess_function(examples):
     # Setup the tokenizer for targets
     labels = tokenizer(text_target=examples["summary"], max_length=max_target_length, truncation=True)
 
-    model_inputs["labels"] = labels["input_ids"]
+    model_inputs["label"] = labels["input_ids"]
     return model_inputs
 
 
@@ -120,37 +124,34 @@ model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
 model = model.to(device)
 
 # %%
-# generation_config = GenerationConfig(max_new_tokens=100, do_sample=True, eos_token_id=model.config.eos_token_id, bos_token_id=model.config.bos_token_id)
-generation_config = GenerationConfig.from_pretrained("t5-small")
-generation_config.min_length = 40
+generation_config = GenerationConfig.from_pretrained(model_checkpoint)
+generation_config.min_length = 5
 generation_config.max_length = 2048
 generation_config.early_stopping = True
-generation_config.pad_token_id
+# generation_config.pad_token_id
+generation_config.no_repeat_ngram_size = 5
+generation_config.temperature = .9
 
 
-# right now it's saying that the tokenizer doens't like the output
-# of the decode...
-# out of range integral type conversion attempted
-# https://github.com/huggingface/transformers/issues/22634
 
 # %%
-batch_size = 32
+batch_size = 16
 model_name = model_checkpoint.split("/")[-1]
 args = Seq2SeqTrainingArguments(
-    f"{model_name}-finetuned-webnlg-d2s-1e-4",
-    eval_steps=600,
+    f"{model_name}-finetuned-webnlg-{TASK}-1e-4",
+    eval_steps=500,
     generation_config=generation_config,
     evaluation_strategy = "steps",
     learning_rate=2e-4,
     per_device_train_batch_size=batch_size,
-    per_device_eval_batch_size=batch_size,
+    per_device_eval_batch_size=6,
     weight_decay=0.01,
     save_total_limit=3,
     num_train_epochs=NUM_TRAIN_EPOCHS,
     predict_with_generate=True,
     fp16=True,
     push_to_hub=False,
-    save_steps=500,
+    save_steps=600,
     generation_max_length=2048,
     generation_num_beams=4,
 )
@@ -170,7 +171,7 @@ def compute_metrics(eval_pred):
     print(predictions)
     predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-    # Replace -100 in the labels as we can't decode them.
+    #444 Replace -100 in the labels as we can't decode them.
     labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
@@ -215,11 +216,7 @@ trainer = Seq2SeqTrainer(
 )
 
 # %%
-try:
-    trainer.train(resume_from_checkpoint=True)
-except Exception as e:
-    print(e)
-    trainer.train()
+trainer.train(resume_from_checkpoint=True)
 # %%
 predictions = trainer.predict(tokenized_datasets['dev'])
 print(predictions)
@@ -236,17 +233,54 @@ t = "The leader of Aarhus is Jacob Bundsgaard."
 tokenizer.decode(trainer.predict([tokenizer(t)]).predictions[0])
 # %%
 
-text_to_prediction_single("Torvalds was born in Helsinki, Finland,"
+text_to_prediction_single("Linus Torvalds was born in Helsinki, Finland,"
                           "the son of journalists Anna and Nils Torvalds")
 # %%
 print("\n".join(map(text_to_prediction_single, [
-    "United_States | leaderName | Barack_Obama",
-    "'Anderson,_Indiana | isPartOf | Fall_Creek_Township,_Madison_County,_Indiana', 'Fall_Creek_Township,_Madison_County,_Indiana | country | United_States', 'Anderson,_Indiana | isPartOf | Indiana'"
+    "<pad> United_States | leaderName | Barack_Obama </s>",
+    "<pad> 'Anderson,_Indiana | isPartOf | Fall_Creek_Township,_Madison_County,_Indiana', 'Fall_Creek_Township,_Madison_County,_Indiana | country | United_States', 'Anderson,_Indiana | isPartOf | Indiana' </s>"
 ])))
 # %%
 
-print("\n".join(map(tokenizer.decode,predictions.predictions)))
+print("\n".join(map(tokenizer.decode,
+                np.where(predictions.predictions != -100, predictions.predictions, tokenizer.pad_token_id)
+                )))
 # %%
 # %%
 max(map(len, predictions.predictions))
 # %% so it must be a count in characters, not tokens. Good to know.
+
+# %%
+predictions.predictions
+# %%
+test_predictions = pd.DataFrame(tokenized_datasets['test'])
+prediction_ids = pd.Series(list(predictions.predictions))
+test_predictions['predicted'] = (prediction_ids
+        .map(list)
+        .map(lambda x: [a for a in x if a != -100 and a != 0])
+        .map(tokenizer.decode)
+)
+rouge = load('rouge')
+# %%
+test_predictions['rouge'] = (
+    (test_predictions['predicted'].map(lambda x: [x]) + test_predictions['summary'].map(lambda x: [x]))
+    .map(lambda x: rouge.compute(references=[x[0]], predictions=[x[1]], use_stemmer=False, use_aggregator=False, rouge_types=['rouge2']))
+    .map(lambda x: x['rouge2'][0])
+)
+                
+# %%
+# test_predictions['rouge'] = rouge.compute(predictions=test_predictions['predicted'], references=test_predictions['summary'])
+# %%
+test_predictions.to_pickle("metrics/" + model_checkpoint +'-'+ TASK + '-test.pkl')
+# %%
+
+Path(f"metrics/{model_checkpoint}-{TASK}_log_hist").write_text(str(trainer.state.log_history))
+# %%
+# %%
+df = pd.DataFrame(raw_datasets['train'])
+df['text'] = df['modified_triple_sets'].map(lambda x : " ".join(x['mtriple_set'][0]))
+# %%
+df['tokenlen'] = df['text'].map(tokenizer).map(lambda x: x['input_ids']).map(len)
+# %%
+df['tokenlenprime'] = df['text'].str.replace("_", " ").map(tokenizer).map(lambda x: x['input_ids']).map(len)
+# %%

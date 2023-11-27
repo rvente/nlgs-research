@@ -46,7 +46,7 @@ def show_random_elements(dataset, num_examples=5):
     for column, typ in dataset.features.items():
         if isinstance(typ, datasets.ClassLabel):
             df[column] = df[column].transform(lambda i: typ.names[i])
-    display(HTML(df.to_html()))
+    return df
 
 # %%
 show_random_elements(raw_datasets["train"])
