@@ -1,7 +1,5 @@
 
 # %%
-%load_ext autoreload
-%autoreload 2
 # %%
 from datasets import load_dataset, Dataset
 from evaluate import load
@@ -116,9 +114,7 @@ seq(df.loc[16093].to_dict().items())
 # %%
 df
 # %%
-
-# Dataset.from_pandas(df=df[df['subset'] == "val"], split='val')
 df
 # %%
-df?
+df.to_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
 # %%

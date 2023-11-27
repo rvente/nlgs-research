@@ -1,102 +1,62 @@
 # %%
-from huggingface_hub import notebook_login
+import os
+import random
+from pathlib import Path
+
+import datasets
+import nltk
+import numpy as np
+import pandas as pd
 import torch
+import transformers
+
+from datasets import Dataset, concatenate_datasets
+from evaluate import combine, load
+from huggingface_hub import notebook_login
+from IPython.display import HTML, display
+from transformers import (AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq,
+                          GenerationConfig, Seq2SeqTrainer,
+                          Seq2SeqTrainingArguments)
+
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
 assert torch.cuda.is_available()
 
 # notebook_login()
 NUM_TRAIN_EPOCHS = 10
 TASK = 'd2s'
-# %%
-import transformers
-
-print(transformers.__version__)
-
 model_checkpoint = "t5-small"
-# %%
-from datasets import load_dataset
-from evaluate import load, combine
+NATURAL_LANGUAGE = "nl"
+STRUCTURED_DATA = "sd"
 
-raw_datasets = load_dataset("web_nlg", "release_v2")
+TARGET = STRUCTURED_DATA if TASK == 'd2s' else NATURAL_LANGUAGE
+INPUT = NATURAL_LANGUAGE if TASK == 'd2s' else STRUCTURED_DATA
+assert TARGET != INPUT
+# %%
+# %%
+df = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
+df
+# %%
+
 metric = combine([
     load("rouge"),
     load("bleu"),
     load('meteor'),
 ])
-raw_datasets
 # %%
-fst_samp = raw_datasets["train"][0]
-fst_samp
-
-# %%
-def fill_summary_and_document(training_sample):
-    sp = dict(training_sample)
-    sentences = " ".join(training_sample["lex"]['text'])
-    data = " ".join(training_sample['modified_triple_sets']['mtriple_set'][0])
-
-    # Data to sentence
-    # sp["document"] = data
-    # sp["summary"] = sentences
-
-    # sentence to data
-    sp["document"] = sentences
-    sp["summary"] = data
-
-    del sp['category']
-    del sp['lex']
-    del sp['original_triple_sets']
-    del sp['modified_triple_sets']
-    return sp
-# %%
-fill_summary_and_document(fst_samp)
-# %%
-doc_sum_datasets = raw_datasets.map(fill_summary_and_document)
-
-# %%
-import datasets
-import random
-import pandas as pd
-from IPython.display import display, HTML
-
-def show_random_elements(dataset, num_examples=5):
-    assert num_examples <= len(dataset), "Can't pick more elements than there are in the dataset."
-    picks = []
-    for _ in range(num_examples):
-        pick = random.randint(0, len(dataset)-1)
-        while pick in picks:
-            pick = random.randint(0, len(dataset)-1)
-        picks.append(pick)
-
-    df = pd.DataFrame(dataset[picks])
-    for column, typ in dataset.features.items():
-        if isinstance(typ, datasets.ClassLabel):
-            df[column] = df[column].transform(lambda i: typ.names[i])
-    display(HTML(df[["modified_triple_sets", 'lex']].to_html()))
-
-# %%
-show_random_elements(raw_datasets["train"])
+df
 # %%
 metric
 # %%
-# fake_preds = ["hello there", "general kenobi"]
-# fake_labels = ["hello there", "general kenobi"]
-# metric.compute(predictions=fake_preds, references=fake_labels)
 
 # %%
 from transformers import AutoTokenizer
-
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-
-# %%
-if model_checkpoint in ["t5-small", "t5-base", "t5-large", "t5-3b", "t5-11b"]:
-    prefix = "summarize: "
-else:
-    prefix = ""
 # %%
 max_input_length = 256
 max_target_length = 256
 
 def preprocess_function(examples):
-    inputs = [prefix + doc for doc in examples["document"]]
+    inputs = examples["document"]
     model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True)
 
     # Setup the tokenizer for targets
@@ -105,20 +65,17 @@ def preprocess_function(examples):
     model_inputs["label"] = labels["input_ids"]
     return model_inputs
 
-
-preprocess_function(doc_sum_datasets['train'][:2])
+tokenize = lambda x: tokenizer(x, max_length = max_input_length, truncation=True, padding=True)
+tokenized = tokenize(list(df[INPUT].values))
+# %%
+# %%
+df['input_ids'] = tokenized['input_ids']
+df['attention_mask'] = tokenized['attention_mask']
+df['label'] = df[TARGET].map(tokenize).map(lambda x: x['input_ids'])
 
 # TODO: figure out what the target length should be and if it's actually training on the right data
 # https://huggingface.co/docs/transformers/v4.29.1/en/tasks/translation#translation
 
-# %%
-tokenized_datasets = doc_sum_datasets.map(preprocess_function, batched=True)
-
-# %%
-import torch
-
-# %%
-from transformers import AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, Seq2SeqTrainingArguments, Seq2SeqTrainer, GenerationConfig
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
 model = model.to(device)
@@ -128,7 +85,6 @@ generation_config = GenerationConfig.from_pretrained(model_checkpoint)
 generation_config.min_length = 5
 generation_config.max_length = 2048
 generation_config.early_stopping = True
-# generation_config.pad_token_id
 generation_config.no_repeat_ngram_size = 5
 generation_config.temperature = .9
 
@@ -138,7 +94,7 @@ generation_config.temperature = .9
 batch_size = 16
 model_name = model_checkpoint.split("/")[-1]
 args = Seq2SeqTrainingArguments(
-    f"{model_name}-finetuned-webnlg-{TASK}-1e-4",
+    f"models/{model_name}-finetuned-webnlg-{TASK}-2e-4",
     eval_steps=500,
     generation_config=generation_config,
     evaluation_strategy = "steps",
@@ -160,12 +116,6 @@ args = Seq2SeqTrainingArguments(
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
 # %%
-import nltk
-import numpy as np
-import os
-from pathlib import Path
-os.environ["TOKENIZERS_PARALLELISM"] = "true"
-
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
     print(predictions)
@@ -187,15 +137,6 @@ def compute_metrics(eval_pred):
     prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in predictions]
     result["gen_len"] = np.mean(prediction_lens)
 
-    # TODO: checkme
-    # bertscore = load("bertscore")
-    # bscore = {
-    #     ("bertscore"+k):
-    #     (np.mean(v) if not isinstance(v, str) else v)
-    #     for k,v in bertscore.compute(predictions=decoded_preds, references=decoded_labels, lang='en').items()
-    # }
-
-    # ret = {**result, **bscore}
     ret = result
     print(ret)
     p = Path("snapshots/metrics")
@@ -205,18 +146,31 @@ def compute_metrics(eval_pred):
     return ret
 
 # %%
+df['input_ids'].map(len)
+# %%
+def pd_to_dataset(df: pd.DataFrame, split='train') -> Dataset:
+    d = Dataset.from_pandas(df[df.subset== split ][['input_ids','attention_mask','label']], split=split)
+    return d.remove_columns("__index_level_0__")
+pd_to_dataset(df, 'train')
+# %%
+model(np.array([1, 2]))
+# %%
 trainer = Seq2SeqTrainer(
     model,
     args,
-    train_dataset=tokenized_datasets["train"],
-    eval_dataset=tokenized_datasets["dev"],
+    train_dataset=pd_to_dataset(df, 'train')['input_ids'],
+    eval_dataset=pd_to_dataset(df, 'test')['label'],
     data_collator=data_collator,
     tokenizer=tokenizer,
     compute_metrics=compute_metrics,
 )
 
 # %%
-trainer.train(resume_from_checkpoint=True)
+try:
+    trainer.train(resume_from_checkpoint=True)
+except ValueError as e:
+    trainer.train()
+
 # %%
 predictions = trainer.predict(tokenized_datasets['dev'])
 print(predictions)
@@ -248,8 +202,6 @@ print("\n".join(map(tokenizer.decode,
 # %%
 # %%
 max(map(len, predictions.predictions))
-# %% so it must be a count in characters, not tokens. Good to know.
-
 # %%
 predictions.predictions
 # %%
@@ -270,17 +222,4 @@ test_predictions['rouge'] = (
                 
 # %%
 # test_predictions['rouge'] = rouge.compute(predictions=test_predictions['predicted'], references=test_predictions['summary'])
-# %%
-test_predictions.to_pickle("metrics/" + model_checkpoint +'-'+ TASK + '-test.pkl')
-# %%
-
-Path(f"metrics/{model_checkpoint}-{TASK}_log_hist").write_text(str(trainer.state.log_history))
-# %%
-# %%
-df = pd.DataFrame(raw_datasets['train'])
-df['text'] = df['modified_triple_sets'].map(lambda x : " ".join(x['mtriple_set'][0]))
-# %%
-df['tokenlen'] = df['text'].map(tokenizer).map(lambda x: x['input_ids']).map(len)
-# %%
-df['tokenlenprime'] = df['text'].str.replace("_", " ").map(tokenizer).map(lambda x: x['input_ids']).map(len)
 # %%
