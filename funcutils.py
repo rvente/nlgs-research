@@ -10,8 +10,11 @@ class Underscore:
             return lambda x: x.__getattribute__(atr)(*args, **kwargs)
             
         return _inner
+
+class Getter:
     def __getitem__(self, item):
         """ _[t] == lambda x: x[t] """
         return itemgetter(item)
 
 underscore = Underscore()
+get = Getter()

@@ -19,9 +19,9 @@ from IPython.display import display, HTML
 # %%
 from functional import seq
 from funcutils import underscore as _
+from funcutils import get 
 from unidecode import unidecode
 # %%
-
 # import webnlg 2.0
 raw_datasets = load_dataset("web_nlg", "release_v2")
 raw_datasets
@@ -38,17 +38,18 @@ df_raw = pd.concat([
 df_raw = df_raw.reset_index()
 df = df_raw[['subset','category','index']]
 df
-# %%
+# %% 
 
 # natural language
-nl_len = df_raw['lex'].map(_["text"]).map(len)
+nl_len = df_raw['lex'].map(get["text"]).map(len)
 nl_len
 # %%
-nl = df_raw['lex'].map(_['text']).map(lambda x: " ".join(x))
+# TODO: find sentences that repeat the same content in multiple ways.
+nl = df_raw['lex'].map(get['text']).map(lambda x: " ".join(x))
 nl
 # %%
 # structured data
-sd = df_raw['modified_triple_sets'].map(_['mtriple_set']).map(_[0])
+sd = df_raw['modified_triple_sets'].map(get['mtriple_set']).map(get[0])
 sdl = sd.map(len)
 display(sd)
 display(sdl)
@@ -59,23 +60,22 @@ def normalize_terms(rdf_triples: list[str]):
     '''surround terms, remove _ and " as well '''
     camelcase = re.compile(r'(?<!^)(?=[A-Z])')
 
-    # camelCase to space separated
-    de_camelcase = lambda x: camelcase.sub(' ', x).lower() 
+    # camelCase to space separated, except for all-caps words
+    de_camelcase = lambda x: camelcase.sub(' ', x).lower() if not x.upper() == x else x
+    decamelcase_middle = lambda x: [x[0], de_camelcase(x[1]), x[2]]
 
-    def enclose(triple: list[str]):
-       return (
-          seq(triple)
-            .map(_.replace(';', "")) # only 40 of these exist
-            .reduce(lambda x,y: x + "|" + y)
-       )
+    def join_with_bar(triple: list[str]):
+       return seq(triple).reduce(lambda x,y: x + "|" + y)
+
         
     return (
         seq(rdf_triples)
           .map(_.replace("_", " "))
           .map(_.replace('"', ""))
+          .map(_.replace(';', "")) # only 40 of these exist
           .map(_.split(" | "))
-          .map(lambda x: [x[0], de_camelcase(x[1]), x[2]])
-          .map(enclose)
+          .map(decamelcase_middle)
+          .map(join_with_bar)
     )
 
 
@@ -87,7 +87,6 @@ nsd
 # While we're at it, perform some data cleaning
 # including normalizing to unicode
 # %%
-seq(nsd.map(set).values).reduce(set.union)
 vocab_freq = seq(nsd).map(Counter).reduce(op.add)
 seq(vocab_freq.keys()).sorted().reduce(op.add)
 # %%
@@ -110,11 +109,6 @@ df['nl'] = nnl
 df
 # %%
 seq(df.loc[16093].to_dict().items())
-# %%
-# %%
-df
-# %%
-df
 # %%
 df.to_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
 # %%

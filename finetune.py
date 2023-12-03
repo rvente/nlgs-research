@@ -23,7 +23,7 @@ assert torch.cuda.is_available()
 
 # notebook_login()
 NUM_TRAIN_EPOCHS = 5
-TASK = 'd2s'
+TASK = 'd2s' # or 's2d' or 'mt' pull from argv
 model_checkpoint = "t5-small"
 
 NATURAL_LANGUAGE = "nl"
@@ -34,12 +34,9 @@ INPUT = STRUCTURED_DATA if TASK == 'd2s' else NATURAL_LANGUAGE
 assert TARGET != INPUT
 # %%
 # %%
-# TODO: for the multimodal one, add another pkl file here
-df = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
+# TODO: for the multi-tasking one, add another pkl file here
+df = pd.read_pickle(f"~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean{if TASK != 'mt' else ''}.pkl")
 df
-# %%
-# %%
-
 # %%
 from transformers import AutoTokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
@@ -103,7 +100,6 @@ metric = combine([
     # load("bleu"),
     # load('meteor'),
 ])
-# %%
 metric
 # %%
 def compute_metrics(eval_pred):
@@ -119,9 +115,7 @@ def compute_metrics(eval_pred):
     decoded_preds = ["\n".join(nltk.sent_tokenize(pred.strip())) for pred in decoded_preds]
     decoded_labels = ["\n".join(nltk.sent_tokenize(label.strip())) for label in decoded_labels]
 
-    # Note that other metrics may not have a `use_aggregator` parameter
-    # and thus will return a list, computing a metric for each sentence.
-    result = metric.compute(predictions=decoded_preds, references=decoded_labels)#, use_stemmer=True, use_aggregator=True)
+    result = metric.compute(predictions=decoded_preds, references=decoded_labels)
 
     # Add mean generated length
     prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in predictions]
@@ -143,7 +137,6 @@ def pd_to_dataset(df: pd.DataFrame, split='train') -> Dataset:
     return d.remove_columns("__index_level_0__")
 pd_to_dataset(df, 'train')
 # %%
-# %%
 trainer = Seq2SeqTrainer(
     model,
     args,
@@ -155,7 +148,7 @@ trainer = Seq2SeqTrainer(
 )
 
 # %%
-# we try-catch because resume_from_checkpoint returns a value error?!
+# we try-catch because resume_from_checkpoint returns a value error (?!)
 # if training did not begin first.
 try:
     trainer.train(resume_from_checkpoint=True)
@@ -178,6 +171,8 @@ pred_df = pred_df.reset_index()
 pred_df
 # %%
 pred_df.to_pickle(f"~/repos/nlgs-research/pipeline/predictions/{TASK}-{model_name}-{NUM_TRAIN_EPOCHS}.pkl")
+# %% [markdown]
+# ## Sanity Checks
 # %%
 t = "The leader of Aarhus is Jacob Bundsgaard."
 tokenizer.decode(trainer.predict([tokenizer(t)]).predictions[0])
