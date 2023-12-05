@@ -34,21 +34,23 @@ root_path = Path("/home/vente/repos/nlgs-research")
 INPUT_TO_ANALYSE = ""
 
 # TODO: get this file form argv so driver code can run all analyses in a loop
-[pkl, *rest] = list( (root_path / "pipeline/predictions").glob("*s2d*"))
+pkl = max( (root_path / "pipeline/predictions").glob("*s2d*"))
 pkl.name
 # %%
 OUTPUT_PATH = Path("/home/vente/repos/nlgs-research/pipeline/scores") / pkl.name.removesuffix(".pkl")
 OUTPUT_PATH.mkdir(exist_ok=True)
 OUTPUT_PATH
 # %%
-corpus = pd.read_pickle(root_path / "pipeline/normalized_data/webnlg_clean.pkl")
-test_predictions = pd.read_pickle(pkl)
-test_corpus = corpus[corpus['subset']=='test']
-test_corpus 
+# corpus = pd.read_pickle(root_path / "pipeline/normalized_data/webnlg_clean.pkl")
+# test_predictions = pd.read_pickle(pkl)
+# test_corpus = corpus[corpus['subset']=='test'].copy()
+# test_corpus 
 # %%
 compute_rouge = lambda x,y: rouge.compute(references=[x], predictions=[x], use_stemmer=False, use_aggregator=False, rouge_types=['rouge2'])
 
 test_predictions['decoded']
+# TODO: need to unflatten so interop with test corpus? Not quite.
+
 # %%
 test_predictions
 # %% [markdown]
@@ -94,7 +96,7 @@ norm_split_set = lambda x: x.str.upper().str.replace("'", '').str.replace(' ',''
 y_pred = norm_split_set(test_predictions['decoded'])
 y_pred
 # %%
-y_true = norm_split_set(test_corpus['sd'])
+y_true = norm_split_set(test_predictions['sd'])
 y_true
 # %%
 
@@ -122,9 +124,10 @@ edit_distances = (
 )
 edit_distances 
 # %%
-results = pd.merge(corpus, test_predictions)
+results = test_predictions
 results['f1_scores'] = f1_scores
 results['med_scores'] = edit_distances # med mean edit distance
+results 
 # %%
 # let's define nth finish and "place-number" as 0 for "finishing in first place"
 # give find the place-number given a score: ties should have the same place
@@ -155,7 +158,7 @@ worst_finishes = results[results.f1_scores == 0]
 dspl_html(worst_finishes[['med_scores','f1_scores', 'decoded','sd']].to_html())
 print(len(worst_finishes))
 # %%
-len(results)
+results[['med_scores','f1_scores']].describe()
 # %%
 results['f1_scores'].hist(bins=15)
 # %%
@@ -176,4 +179,6 @@ npc.sort_values().plot.bar()
 # teams and monuments, which have good representation in the training set but do
 # not have good performance. This points to qualitative features particular to
 # entries in those categories.
+# %%
+worst_finishes.sort_values(by=['med_scores'])
 # %%

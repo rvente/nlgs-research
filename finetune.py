@@ -35,26 +35,13 @@ TARGET = NATURAL_LANGUAGE if TASK == 'd2s' else STRUCTURED_DATA
 INPUT = STRUCTURED_DATA if TASK == 'd2s' else NATURAL_LANGUAGE 
 assert TARGET != INPUT
 # %%
-df = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
-df
-# %%
 from transformers import AutoTokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 # %%
 max_input_length = 256
 max_target_length = 256
 tokenize = lambda x: tokenizer(x, max_length = max_input_length, truncation=True, padding=True)
-tokenized = tokenize(list(df[INPUT].values))
 # %%
-# [markdown]
-# The following fields comprise the "interface" of the model, despite the fact
-# the documentation doesn't make this obvious. 
-# %%
-
-df['input_ids'] = tokenized['input_ids']
-df['attention_mask'] = tokenized['attention_mask']
-df['labels'] = df[TARGET].map(lambda x: [tokenize(e)['input_ids'] for e in x])
-
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
 model = model.to(device)
@@ -68,7 +55,7 @@ generation_config.no_repeat_ngram_size = 5
 generation_config.temperature = .9
 
 # %%
-batch_size = 32 if model_checkpoint == "t5-small" else 16
+batch_size = 64 if model_checkpoint == "t5-small" else 16
 model_name = model_checkpoint.split("/")[-1]
 args = Seq2SeqTrainingArguments(
     f"models/{model_name}-finetuned-webnlg-{TASK}-2e-4",
@@ -76,7 +63,7 @@ args = Seq2SeqTrainingArguments(
     evaluation_strategy = "steps",
     learning_rate=2e-4,
     per_device_train_batch_size=batch_size,
-    per_device_eval_batch_size=6,
+    per_device_eval_batch_size=batch_size//2,
     weight_decay=0.01,
     save_total_limit=3,
     num_train_epochs=NUM_TRAIN_EPOCHS,
@@ -103,6 +90,7 @@ metric = combine([
 metric
 # %%
 def compute_metrics(eval_pred, task):
+    # Note since this is a sequence-to
     predictions, labels = eval_pred
     print(predictions)
     predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
@@ -129,44 +117,66 @@ def compute_metrics(eval_pred, task):
     return ret
 
 # %%
-df['input_ids'].map(len)
+df = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
+df
+# %%
+# we must invent `seed_number` since d2s can output multiple sentences for the
+# same data input. So the seed will be a generation parameter, in the case that
+# we are working in a deterministic environment, so generation can vary as
+# desired.
+
+cartesian_sd_nl = []
+for (i, subset, cat, indx, sd, nl) in df.itertuples():
+    for j, candidate in enumerate(nl):
+        pairing = dict(
+            record_idx=i,
+            seed_number=j,
+            subset=subset,
+            category=cat,
+            split_index=indx,
+            sd=sd,
+            nl=candidate,
+        )
+        cartesian_sd_nl.append(pairing)
+# calling this "flattened" because it no longer has nested records
+flt = pd.DataFrame(cartesian_sd_nl)
+
+# %%
+# prepend the seed number. This should be rt of the prompt hereafter for `d2s`
+# tasks. So, prompting with two different numbers should never generate the same
+# output.
+if TASK == "d2s":
+    flt['sd'] = flt.seed_number.map(lambda x: "<" + str(x) + "> ")  + flt.sd
+flt
+# %%
+tokenized = tokenize(list(flt[INPUT].values))
+# %%  [markdown]
+# !!WARNING!! The following fields comprise the "interface" of the model,
+# despite the fact the documentation doesn't make this obvious. Without these
+# particular names, ['input_ids', 'attention_mask', 'labels'],
+# the model will not train and provide cryptic error messages
+# %%
+flt['input_ids'] = tokenized['input_ids']
+flt['attention_mask'] = tokenized['attention_mask']
+flt['labels'] = flt[TARGET].map(lambda x: tokenize(x)['input_ids'])
+flt['input_ids'].map(len)
+# %%
+flt.input_ids.sample(300).map(str).to_json('vis.json')
 # %%
 def pd_to_dataset(df: pd.DataFrame, split='train') -> Dataset:
-    if split != 'train':
-        d = df[df.subset== split ][['input_ids','attention_mask','labels']].head(30)
-        d.labels =d.labels.map(get[0])
-        d = Dataset.from_pandas(d, split=split)
-        return d.remove_columns("__index_level_0__")
-    else:
-        distribute_x_over_y = lambda x, y: seq([x]).cartesian(y).to_list()
-        d = df[df.subset== split ][['input_ids','attention_mask','labels']]
-        # there's a simplified way to do this but this is was more test-able.
-        # TODO: write me!
-        if TASK == 'mt':
-            # interlaced data - be sure to prepend task specifier
-            df 
-
-        if TASK == 'd2s':
-            pairings = (
-            seq(d.input_ids)
-                .zip(d.attention_mask)
-                .zip(d.labels)
-                .starmap(distribute_x_over_y)
-                .map(lambda x: [x[0][0][0], x[0][0][1], x[0][1] ])
-            )
-            pair_df = pd.DataFrame(pairings, columns=['input_ids','attention_mask','labels'])
-            return Dataset.from_pandas(pair_df)
-        if TASK == 's2d':
-            
-
+    d = df[df.subset== split ][['input_ids','attention_mask','labels']]
+    return Dataset.from_pandas(d)
         
-pd_to_dataset(df, 'train')
+# get_ds alias should bake in the desired argument. Makes you wish python
+# supported currying
+get_ds = lambda x: pd_to_dataset(flt, x)
+get_ds('train')
 # %%
 trainer = Seq2SeqTrainer(
     model,
     args,
-    train_dataset=pd_to_dataset(df, 'train'),
-    eval_dataset=pd_to_dataset(df, 'dev'),
+    train_dataset=get_ds('train'),
+    eval_dataset=get_ds('dev'),
     data_collator=data_collator,
     tokenizer=tokenizer,
     compute_metrics=lambda x: compute_metrics(x, 'd2s'),
@@ -183,21 +193,30 @@ except ValueError as e:
 
 # trainer.train()
 # %%
-predictions = trainer.predict(pd_to_dataset(df,'test'))
+# %%
+predictions = trainer.predict(get_ds('test'))
+predictions
 predictions
 # %%
 def text_to_prediction_single(text):
     return tokenizer.decode(trainer.predict([tokenizer(text)]).predictions[0])
 
 # %%
+flat_keep_positive = lambda x: [e for e in x if e > 1]
 pred_df = pd.DataFrame(columns=['pred_ids'], data=pd.Series(list(predictions.predictions)))
-pred_df['decoded'] = pred_df.pred_ids.map(lambda x: [e for e in x if e > 1]).map(tokenizer.decode)
+test_set = flt[flt.subset == 'test']
+decoded = pred_df.pred_ids.map(flat_keep_positive).map(tokenizer.decode)
+test_set['decoded'] = decoded
+pred_df['decoded'] = decoded
+test_set['pred_ids'] = pred_df.pred_ids
 pred_df['subset'] = 'test'
 
 pred_df = pred_df.reset_index()
 pred_df
 # %%
-pred_df.to_pickle(f"~/repos/nlgs-research/pipeline/predictions/{TASK}-{model_name}-{NUM_TRAIN_EPOCHS}.pkl")
+save_fname = f"~/repos/nlgs-research/pipeline/predictions/{TASK}-{model_name}-{NUM_TRAIN_EPOCHS}.pkl"
+test_set.to_pickle(save_fname)
+save_fname
 # %% [markdown]
 # ## Sanity Checks
 # %%
