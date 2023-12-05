@@ -14,7 +14,7 @@ from editdistance import distance as edit_distance
 
 import matplotlib.pyplot as plt
 # %%
-plt.style.use('seaborn-v0_8-whitegrid') # I personally prefer seaborn for the graph style, but you may choose whichever you want.
+plt.style.use('seaborn-v0_8-whitegrid')
 params = {"ytick.color" : "black",
           "xtick.color" : "black",
           "axes.labelcolor" : "black",

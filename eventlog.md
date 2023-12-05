@@ -146,3 +146,33 @@ now I want to define the different subsets from the data as reversed elements fo
 
 Now finetine.py is great. I will find a subset that the model performs particularly badly on, and generate synthetic data with that subset in mind.
 
+
+I actually _can_ use their models and have an apples-to-apples comparison
+As long as I do the same pre-procesing.
+
+
+Great. I finished training the small versions and I fixed a bug.
+
+5 December
+
+I need to write analysis d2s.py which will simply re-use evaluation code I have already written.
+
+
+
+Multitasking up next
+
+now I need to train the multi-task version, and be sure to save
+the predictions from each of the subsets
+
+
+
+
+1. Find the most common relations for artists and politicians
+1. At first _any_ prompt for synthetic data generation will suffice
+1. d2t and t2d networks on synthetic data (naive)
+
+
+principled prompt engineering
+1. Figure out why it's so slow
+1. evaluate on webnlg random subsample of 50 (at first)
+

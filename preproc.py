@@ -1,31 +1,31 @@
-
 # %%
-# %%
-from datasets import load_dataset, Dataset
-from evaluate import load
-from operator import itemgetter
-import operator as op
-import re
-
-# %%
-import datasets
-import random
 import functools
-import matplotlib.pyplot as plt
-import matplotlib
-import pandas as pd
+import operator as op
+import random
+import re
 from collections import Counter
-from IPython.display import display, HTML
-# %%
+from operator import itemgetter
+
+import datasets
+import matplotlib
+import matplotlib.pyplot as plt
+import pandas as pd
+from datasets import Dataset, load_dataset
+from evaluate import load
 from functional import seq
-from funcutils import underscore as _
-from funcutils import get 
+from IPython.display import HTML, display
 from unidecode import unidecode
+
+from funcutils import get
+from funcutils import underscore as _
+
 # %%
 # import webnlg 2.0
 raw_datasets = load_dataset("web_nlg", "release_v2")
 raw_datasets
 
+# datasets api doesn't support direct indexing so we have to
+# perform some unnatural contortions
 df_raw = pd.concat([
         pd.concat([
             pd.DataFrame(raw_datasets[e]),
@@ -37,25 +37,18 @@ df_raw = pd.concat([
 
 df_raw = df_raw.reset_index()
 df = df_raw[['subset','category','index']]
-df
 # %% 
-
-# natural language
-nl_len = df_raw['lex'].map(get["text"]).map(len)
-nl_len
-# %%
-# TODO: find sentences that repeat the same content in multiple ways.
-nl = df_raw['lex'].map(get['text']).map(lambda x: " ".join(x))
+# extract natural language from inside lex column
+nl = df_raw.lex.map(get.text)
 nl
 # %%
-# structured data
-sd = df_raw['modified_triple_sets'].map(get['mtriple_set']).map(get[0])
+# extract structured data from the mtriple set
+sd = df_raw.modified_triple_sets.map(get.mtriple_set).map(get[0])
 sdl = sd.map(len)
 display(sd)
 display(sdl)
 # %%
 # normalized structured data
-
 def normalize_terms(rdf_triples: list[str]):
     '''surround terms, remove _ and " as well '''
     camelcase = re.compile(r'(?<!^)(?=[A-Z])')
@@ -70,16 +63,18 @@ def normalize_terms(rdf_triples: list[str]):
         
     return (
         seq(rdf_triples)
-          .map(_.replace("_", " "))
-          .map(_.replace('"', ""))
-          .map(_.replace(';', "")) # only 40 of these exist
+          .map(_.replace("_", " ")) # normalize away underscores
+          .map(_.replace('"', ""))  # delete full quotes
+          .map(_.replace("'", ""))  # delete half quotes
+          .map(_.replace(';', ""))  # only 40 of these exist
           .map(_.split(" | "))
           .map(decamelcase_middle)
           .map(join_with_bar)
+          .map(unidecode)
     )
 
 
-nsd = sd.map(normalize_terms).map(lambda x: "; ".join(x)).map(unidecode)
+nsd = sd.map(normalize_terms).map(lambda x: "; ".join(x))
 nsd
 # %%
 # %% [markdown]
@@ -100,15 +95,14 @@ assert trmlen == 3
 assert freq >= len(counts.values)
 # %%
 df['sd'] = nsd
-df
+df.sd
 # %%
 # normalize by removing ascii
-nnl = nl.map(unidecode)
+nnl = nl.map(lambda x: seq(x).map(unidecode).to_list())
 df['nl'] = nnl
+df.nl
 # %%
 df
-# %%
-seq(df.loc[16093].to_dict().items())
 # %%
 df.to_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
 # %%

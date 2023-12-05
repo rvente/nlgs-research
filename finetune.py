@@ -12,6 +12,8 @@ import transformers
 
 from datasets import Dataset, concatenate_datasets
 from evaluate import combine, load
+from functional import seq
+from funcutils import get
 from huggingface_hub import notebook_login
 from IPython.display import HTML, display
 from transformers import (AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq,
@@ -23,7 +25,7 @@ assert torch.cuda.is_available()
 
 # notebook_login()
 NUM_TRAIN_EPOCHS = 5
-TASK = 'd2s' # or 's2d' or 'mt' pull from argv
+TASK = 's2d' # or 's2d' or 'mt' pull from argv
 model_checkpoint = "t5-small"
 
 NATURAL_LANGUAGE = "nl"
@@ -33,9 +35,7 @@ TARGET = NATURAL_LANGUAGE if TASK == 'd2s' else STRUCTURED_DATA
 INPUT = STRUCTURED_DATA if TASK == 'd2s' else NATURAL_LANGUAGE 
 assert TARGET != INPUT
 # %%
-# %%
-# TODO: for the multi-tasking one, add another pkl file here
-df = pd.read_pickle(f"~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean{if TASK != 'mt' else ''}.pkl")
+df = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
 df
 # %%
 from transformers import AutoTokenizer
@@ -53,7 +53,7 @@ tokenized = tokenize(list(df[INPUT].values))
 
 df['input_ids'] = tokenized['input_ids']
 df['attention_mask'] = tokenized['attention_mask']
-df['labels'] = df[TARGET].map(tokenize).map(lambda x: x['input_ids'])
+df['labels'] = df[TARGET].map(lambda x: [tokenize(e)['input_ids'] for e in x])
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
@@ -68,7 +68,7 @@ generation_config.no_repeat_ngram_size = 5
 generation_config.temperature = .9
 
 # %%
-batch_size = 32 if model_name == "t5-small" else 16
+batch_size = 32 if model_checkpoint == "t5-small" else 16
 model_name = model_checkpoint.split("/")[-1]
 args = Seq2SeqTrainingArguments(
     f"models/{model_name}-finetuned-webnlg-{TASK}-2e-4",
@@ -102,7 +102,7 @@ metric = combine([
 ])
 metric
 # %%
-def compute_metrics(eval_pred):
+def compute_metrics(eval_pred, task):
     predictions, labels = eval_pred
     print(predictions)
     predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
@@ -122,7 +122,6 @@ def compute_metrics(eval_pred):
     result["gen_len"] = np.mean(prediction_lens)
 
     ret = result
-    print(ret)
     p = Path("snapshots/metrics")
     t = p.read_text()
     p.write_text(t + "\n" + str(ret))
@@ -133,18 +132,44 @@ def compute_metrics(eval_pred):
 df['input_ids'].map(len)
 # %%
 def pd_to_dataset(df: pd.DataFrame, split='train') -> Dataset:
-    d = Dataset.from_pandas(df[df.subset== split ][['input_ids','attention_mask','labels']], split=split)
-    return d.remove_columns("__index_level_0__")
+    if split != 'train':
+        d = df[df.subset== split ][['input_ids','attention_mask','labels']].head(30)
+        d.labels =d.labels.map(get[0])
+        d = Dataset.from_pandas(d, split=split)
+        return d.remove_columns("__index_level_0__")
+    else:
+        distribute_x_over_y = lambda x, y: seq([x]).cartesian(y).to_list()
+        d = df[df.subset== split ][['input_ids','attention_mask','labels']]
+        # there's a simplified way to do this but this is was more test-able.
+        # TODO: write me!
+        if TASK == 'mt':
+            # interlaced data - be sure to prepend task specifier
+            df 
+
+        if TASK == 'd2s':
+            pairings = (
+            seq(d.input_ids)
+                .zip(d.attention_mask)
+                .zip(d.labels)
+                .starmap(distribute_x_over_y)
+                .map(lambda x: [x[0][0][0], x[0][0][1], x[0][1] ])
+            )
+            pair_df = pd.DataFrame(pairings, columns=['input_ids','attention_mask','labels'])
+            return Dataset.from_pandas(pair_df)
+        if TASK == 's2d':
+            
+
+        
 pd_to_dataset(df, 'train')
 # %%
 trainer = Seq2SeqTrainer(
     model,
     args,
     train_dataset=pd_to_dataset(df, 'train'),
-    eval_dataset=pd_to_dataset(df, 'test'),
+    eval_dataset=pd_to_dataset(df, 'dev'),
     data_collator=data_collator,
     tokenizer=tokenizer,
-    compute_metrics=compute_metrics,
+    compute_metrics=lambda x: compute_metrics(x, 'd2s'),
 )
 
 # %%
@@ -153,8 +178,10 @@ trainer = Seq2SeqTrainer(
 try:
     trainer.train(resume_from_checkpoint=True)
 except ValueError as e:
+    print(e)
     trainer.train()
 
+# trainer.train()
 # %%
 predictions = trainer.predict(pd_to_dataset(df,'test'))
 predictions
