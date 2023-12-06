@@ -34,6 +34,7 @@ root_path = Path("/home/vente/repos/nlgs-research")
 INPUT_TO_ANALYSE = ""
 
 # TODO: get this file form argv so driver code can run all analyses in a loop
+# or just analayse the outputs of the best model...?
 pkl = max( (root_path / "pipeline/predictions").glob("*s2d*"))
 pkl.name
 # %%
@@ -42,17 +43,12 @@ OUTPUT_PATH.mkdir(exist_ok=True)
 OUTPUT_PATH
 # %%
 # corpus = pd.read_pickle(root_path / "pipeline/normalized_data/webnlg_clean.pkl")
-# test_predictions = pd.read_pickle(pkl)
+test_predictions = pd.read_pickle(pkl)
 # test_corpus = corpus[corpus['subset']=='test'].copy()
 # test_corpus 
 # %%
 compute_rouge = lambda x,y: rouge.compute(references=[x], predictions=[x], use_stemmer=False, use_aggregator=False, rouge_types=['rouge2'])
-
-test_predictions['decoded']
-# TODO: need to unflatten so interop with test corpus? Not quite.
-
 # %%
-test_predictions
 # %% [markdown]
 # How do we formulate F-measure for this task? Usually there is a fixed number
 # of classes, and one label per class. But this class is fundimentally about
@@ -111,7 +107,7 @@ def compute_closest_edit_dists(y_pred, y_true):
         .starmap(edit_distance) 
         .sorted()
         # full penalty for missed guesses or too many guesses
-        .take(seq(y_true, y_pred).map(len).max())
+        # .take(seq(y_true, y_pred).map(len).max())
         .to_list()
     )
 
@@ -160,13 +156,27 @@ print(len(worst_finishes))
 # %%
 results[['med_scores','f1_scores']].describe()
 # %%
-results['f1_scores'].hist(bins=15)
+results.f1_scores.hist(bins=15)
 # %%
-worst_finishes['med_scores'].hist(bins=15)
+worst_finishes.med_scores.hist(bins=15)
+# %%
+# sparse-bar formation of the same histogram data
+ax = (
+  worst_finishes
+  .med_scores
+  .sort_values()
+  .map(lambda x: (x // 10) * 10)
+  .map(lambda x: "[" + str(int(x)) + ", " + str(int(x+10)) + ")")
+  .value_counts()
+  # .plot.bar()
+)
+# ax.set_yscale('log')
+print(ax.to_latex())
+print(ax.to_markdown())
 # %%
 worst_finishes.category.value_counts().plot.bar()
 # %%
-train_corpus = corpus[corpus.subset == 'train']
+train_corpus = test_predictions
 train_corpus.category.value_counts().plot.bar()
 # %%
 # normalized performance by category

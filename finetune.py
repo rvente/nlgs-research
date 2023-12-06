@@ -25,7 +25,7 @@ assert torch.cuda.is_available()
 
 # notebook_login()
 NUM_TRAIN_EPOCHS = 5
-TASK = 's2d' # or 's2d' or 'mt' pull from argv
+TASK = 's2d' # 'd2s' or 's2d' or 'mt' pull from argv
 model_checkpoint = "t5-small"
 
 NATURAL_LANGUAGE = "nl"
@@ -204,15 +204,16 @@ def text_to_prediction_single(text):
 # %%
 flat_keep_positive = lambda x: [e for e in x if e > 1]
 pred_df = pd.DataFrame(columns=['pred_ids'], data=pd.Series(list(predictions.predictions)))
-test_set = flt[flt.subset == 'test']
 decoded = pred_df.pred_ids.map(flat_keep_positive).map(tokenizer.decode)
-test_set['decoded'] = decoded
 pred_df['decoded'] = decoded
-test_set['pred_ids'] = pred_df.pred_ids
 pred_df['subset'] = 'test'
-
-pred_df = pred_df.reset_index()
+# %%
 pred_df
+# %%
+test_set = flt[flt.subset == 'test'].copy()
+test_set['pred_ids'] = list(pred_df['pred_ids'].values)
+test_set['decoded'] = list(pred_df['decoded'].values)
+test_set
 # %%
 save_fname = f"~/repos/nlgs-research/pipeline/predictions/{TASK}-{model_name}-{NUM_TRAIN_EPOCHS}.pkl"
 test_set.to_pickle(save_fname)
