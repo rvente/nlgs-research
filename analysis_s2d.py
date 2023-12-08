@@ -42,10 +42,7 @@ OUTPUT_PATH = Path("/home/vente/repos/nlgs-research/pipeline/scores") / pkl.name
 OUTPUT_PATH.mkdir(exist_ok=True)
 OUTPUT_PATH
 # %%
-# corpus = pd.read_pickle(root_path / "pipeline/normalized_data/webnlg_clean.pkl")
 test_predictions = pd.read_pickle(pkl)
-# test_corpus = corpus[corpus['subset']=='test'].copy()
-# test_corpus 
 # %% [markdown]
 # How do we formulate F-measure for this task? Usually there is a fixed number
 # of classes, and one label per class. But this class is fundimentally about
