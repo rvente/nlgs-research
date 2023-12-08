@@ -131,14 +131,14 @@ for (i, subset, cat, indx, sd, nl) in df.itertuples():
             split_index=indx,
             sd=sd,
             nl=nl_option,
-            task=TASK if TASK != 'mt' else 'd2s'
+            task=TASK if TASK != 'mt' else 'd2s' # FIXME HACK change to s2d
         )
         cartesian_sd_nl.append(pairing)
         if TASK == "mt":
             reverse_pair = pairing.copy()
             reverse_pair['sd'] = nl_option
             reverse_pair['nl'] = sd
-            reverse_pair['task'] = 's2d'
+            reverse_pair['task'] = 's2d' # FIXME HACK change to d2s
             cartesian_sd_nl.append(reverse_pair)
 
 # calling this "flattened" because it no longer has nested records
@@ -218,29 +218,33 @@ test_set
 save_fname = f"~/repos/nlgs-research/pipeline/predictions/{TASK}-{MODEL_CKPNT}-{NUM_TRAIN_EPOCHS}.pkl"
 test_set.to_pickle(save_fname)
 save_fname
-# %%
-def text_to_prediction_single(text):
-    return tokenizer.decode(trainer.predict([tokenizer("<pad>" + text + "</s>")]).predictions[0])
-    # return tokenizer.decode(trainer.predict([tokenizer(text)]).predictions[0])
 
 # %% [markdown]
 # ## Sanity Checks
 # %%
+def text_to_prediction_single(text):
+    tensors = tokenizer("<pad>" + text + "</s>", return_tensors='pt').to(device)['input_ids']
+    generation = trainer.model.generate(tensors,
+        early_stopping=True,
+        num_beams=5,
+        max_new_tokens=1024,
+        temperature=1.0,
+    ) 
+    return tokenizer.decode(generation[0], skip_special_tokens=True)
+
 t = "The leader of Aarhus is Jacob Bundsgaard."
-# %%
 text_to_prediction_single(t)
 # %%
 print("\n".join(map(text_to_prediction_single, [
-    's2d 0: Aarhus|leader name|Jacob Bundsgaard',
-    's2d 1: Aarhus|leader name|Jacob Bundsgaard',
-    "s2d 0: United States|leader name|Barack Obama ",
-    '0: The leader of Aarhus is Jacob Bundsgaard.',
-    "0: Linus Torvalds was born in Helsinki, Finland. He is the son of journalists Anna and Nils Torvalds 0: ",
-    "1: Linus Torvalds was born in Helsinki, Finland. He is the son of journalists Anna and Nils Torvalds",
+    'd2s 0: Aarhus|leader name|Jacob Bundsgaard',
+    'd2s 1: Aarhus|leader name|Jacob Bundsgaard',
+    "d2s 0: United States|leader name|Barack Obama ",
+    's2d 0: The leader of Aarhus is Jacob Bundsgaard.',
+    "s2d 0: Linus Torvalds was born in Helsinki, Finland. He is the son of journalists Anna and Nils Torvalds",
+    "s2d 1: Linus Torvalds was born in Helsinki, Finland. He is the son of journalists Anna and Nils Torvalds",
 ])))
 # %%
 print("\n".join(map(tokenizer.decode,
                 np.where(predictions.predictions != -100, predictions.predictions, tokenizer.pad_token_id)
                 )))
 # %%
-max(map(len, predictions.predictions))
