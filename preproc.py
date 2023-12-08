@@ -60,17 +60,16 @@ def normalize_terms(rdf_triples: list[str]):
     def join_with_bar(triple: list[str]):
        return seq(triple).reduce(lambda x,y: x + "|" + y)
 
-        
     return (
-        seq(rdf_triples)
-          .map(_.replace("_", " ")) # normalize away underscores
-          .map(_.replace('"', ""))  # delete full quotes
-          .map(_.replace("'", ""))  # delete half quotes
-          .map(_.replace(';', ""))  # only 40 of these exist
-          .map(_.split(" | "))
-          .map(decamelcase_middle)
-          .map(join_with_bar)
-          .map(unidecode)
+      seq(rdf_triples)
+        .map(_.replace("_", " ")) # normalize away underscores
+        .map(_.replace('"', ""))  # delete full quotes
+        .map(_.replace("'", ""))  # delete half quotes
+        .map(_.replace(';', ""))  # only 40 of these exist
+        .map(_.split(" | "))
+        .map(decamelcase_middle)
+        .map(join_with_bar)
+        .map(unidecode)
     )
 
 

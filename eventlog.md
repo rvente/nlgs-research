@@ -176,3 +176,26 @@ principled prompt engineering
 1. Figure out why it's so slow
 1. evaluate on webnlg random subsample of 50 (at first)
 
+
+I discovered I could use junix to extract images from jupyter notebooks
+but I wish I could save them all as pdf. Perhaps I could deal with doing so via vs code
+or parsing the html post-hoc but that is out of scope.
+
+pip install junix
+
+
+also parameterizing notebooks is possible - so I could in principle have a single
+notebook to run everything.
+
+
+Before submitting, I would like to do a re-run of everything
+just but I guess this is not supposed to come before my paper submission.
+
+
+Refactoring incrementally in between complete runs?
+
+
+Need to perform a join to complete the 
+
+
+eval code for d2s

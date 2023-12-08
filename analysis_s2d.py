@@ -46,9 +46,6 @@ OUTPUT_PATH
 test_predictions = pd.read_pickle(pkl)
 # test_corpus = corpus[corpus['subset']=='test'].copy()
 # test_corpus 
-# %%
-compute_rouge = lambda x,y: rouge.compute(references=[x], predictions=[x], use_stemmer=False, use_aggregator=False, rouge_types=['rouge2'])
-# %%
 # %% [markdown]
 # How do we formulate F-measure for this task? Usually there is a fixed number
 # of classes, and one label per class. But this class is fundimentally about
@@ -163,11 +160,11 @@ worst_finishes.med_scores.hist(bins=15)
 # sparse-bar formation of the same histogram data
 ax = (
   worst_finishes
-  .med_scores
-  .sort_values()
-  .map(lambda x: (x // 10) * 10)
-  .map(lambda x: "[" + str(int(x)) + ", " + str(int(x+10)) + ")")
-  .value_counts()
+    .med_scores
+    .sort_values()
+    .map(lambda x: (x // 10) * 10)
+    .map(lambda x: "[" + str(int(x)) + ", " + str(int(x+10)) + ")")
+    .value_counts()
   # .plot.bar()
 )
 # ax.set_yscale('log')
