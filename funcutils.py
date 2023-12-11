@@ -1,7 +1,7 @@
+# code I wrote to enable ergonomic functional fluent design style in python
 from operator import itemgetter
 
 __all__=["underscore",'get']
-# inspired by https://github.com/fnpy/fn.py/tree/master
 
 class Underscore:
     """ enable point-free functions """

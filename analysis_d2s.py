@@ -14,6 +14,7 @@ from editdistance import distance as edit_distance
 
 import matplotlib.pyplot as plt
 # %%
+# I prefer these LaTeX plots to fit in with the paper better
 plt.style.use('seaborn-v0_8-whitegrid')
 params = {"ytick.color" : "black",
           "xtick.color" : "black",
@@ -29,10 +30,6 @@ dspl_html = lambda x: display_html(x, raw=True)
 rouge = load('rouge')
 # %%
 root_path = Path("/home/vente/repos/nlgs-research")
-
-
-# TODO: get this file form argv so driver code can run all analyses in a loop
-# or just analayse the outputs of the best model...?
 pkl = max( (root_path / "pipeline/predictions").glob("*d2s*"))
 pkl.name
 # %%

@@ -199,3 +199,9 @@ Need to perform a join to complete the
 
 
 eval code for d2s
+
+train the medium variant, produce data and plots
+
+train a single large variant from the best performer thus far
+
+Quantify word overlap, generate synthetic data, train the best model with this current dara, filter out generations which are sufficiently different. Add in synthetic data, and check if it all works out. At least report back numbers for semantic parsing of webnlg, even if you don't use this for prompt refinement.

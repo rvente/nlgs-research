@@ -26,7 +26,7 @@ assert torch.cuda.is_available()
 
 NUM_TRAIN_EPOCHS = 5
 TASK = 'mt' # 'd2s' or 's2d' or 'mt' pull from argv
-MODEL_CKPNT = "t5-small"
+MODEL_CKPNT = "t5-base" # t5-small or t5-base
 NATURAL_LANGUAGE = "nl"
 STRUCTURED_DATA = "sd"
 LR = 2.0e-4
@@ -58,7 +58,8 @@ generation_config.no_repeat_ngram_size = 5
 generation_config.temperature = .9
 
 # %%
-batch_size = 64 if MODEL_CKPNT == "t5-small" else 16
+batch_size = 64 if MODEL_CKPNT == "t5-small" else 32
+# START: ADAPTED FROM https://huggingface.co/docs/transformers/tasks/summarization
 args = Seq2SeqTrainingArguments(
     TRAIN_CHKPNT_NAME,
     eval_steps=1500,
@@ -77,24 +78,25 @@ args = Seq2SeqTrainingArguments(
     generation_max_length=2048,
     generation_num_beams=4,
 )
-
+# END: ADAPTED FROM https://huggingface.co/docs/transformers/tasks/summarization
 # %%
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
-
-
-# %%
 metric = combine([
     load("rouge"),
 ])
 metric
 # %%
+# START: COPIED FROM https://huggingface.co/docs/transformers/tasks/summarization
 def compute_metrics(eval_pred):
-    # Note since this is a sequence-to
+    # monitor memory
+    torchmem = torch.cuda.memory_allocated()
+    torchcap = torch.cuda.get_device_properties(0).total_memory
+    print(f"torch has allocated {torchmem} of {torchcap}")
+
     predictions, labels = eval_pred
-    print(predictions)
     predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-    #444 Replace -100 in the labels as we can't decode them.
+
     labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
@@ -109,7 +111,7 @@ def compute_metrics(eval_pred):
     result["gen_len"] = np.mean(prediction_lens)
 
     return result
-
+# END: COPIED FROM https://huggingface.co/docs/transformers/tasks/summarization
 # %%
 df = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
 df
@@ -131,14 +133,14 @@ for (i, subset, cat, indx, sd, nl) in df.itertuples():
             split_index=indx,
             sd=sd,
             nl=nl_option,
-            task=TASK if TASK != 'mt' else 'd2s' # FIXME HACK change to s2d
+            task=TASK if TASK != 'mt' else 's2d' 
         )
         cartesian_sd_nl.append(pairing)
         if TASK == "mt":
             reverse_pair = pairing.copy()
             reverse_pair['sd'] = nl_option
             reverse_pair['nl'] = sd
-            reverse_pair['task'] = 's2d' # FIXME HACK change to d2s
+            reverse_pair['task'] = 'd2s'
             cartesian_sd_nl.append(reverse_pair)
 
 # calling this "flattened" because it no longer has nested records
@@ -160,7 +162,7 @@ flt
 # %%
 tokenized = tokenize(list(flt[INPUT].values))
 # %%  [markdown]
-# !!WARNING!! The following fields comprise the "interface" of the model,
+# !!Heads-up!! The following fields comprise the "interface" of the model,
 # despite the fact the documentation doesn't make this obvious. Without these
 # particular names, ['input_ids', 'attention_mask', 'labels'],
 # the model will not train and provide cryptic error messges. 
@@ -170,6 +172,7 @@ flt['attention_mask'] = tokenized['attention_mask']
 flt['labels'] = flt[TARGET].map(lambda x: tokenize(x)['input_ids'])
 flt['input_ids'].map(len)
 # %%
+# this will keep only the needed fields in memory on the GPU
 def pd_to_dataset(df: pd.DataFrame, split='train') -> Dataset:
     d = df[df.subset== split ][['input_ids','attention_mask','labels']]
     return Dataset.from_pandas(d)
@@ -190,8 +193,8 @@ trainer = Seq2SeqTrainer(
 )
 
 # %%
-# we try-catch because resume_from_checkpoint returns a value error (?!)
-# if training did not begin first.
+# we must try-catch because resume_from_checkpoint throws a value error (for
+# some reason instead of raising a warning) if training did not begin first.
 try:
     trainer.train(resume_from_checkpoint=True)
 except ValueError as e:
@@ -207,7 +210,6 @@ pred_df = pd.DataFrame(columns=['pred_ids'], data=pd.Series(list(predictions.pre
 decoded = pred_df.pred_ids.map(flat_keep_positive).map(tokenizer.decode)
 pred_df['decoded'] = decoded
 pred_df['subset'] = 'test'
-# %%
 pred_df
 # %%
 test_set = flt[flt.subset == 'test'].copy()
@@ -218,7 +220,6 @@ test_set
 save_fname = f"~/repos/nlgs-research/pipeline/predictions/{TASK}-{MODEL_CKPNT}-{NUM_TRAIN_EPOCHS}.pkl"
 test_set.to_pickle(save_fname)
 save_fname
-
 # %% [markdown]
 # ## Sanity Checks
 # %%

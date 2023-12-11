@@ -40,7 +40,7 @@ OUTPUT_PATH
 # ## First, Data to sentence.
 # %%
 preds_raw = pd.read_pickle(pkl)
-test_predictions = preds_raw[preds_raw.task == 's2d'] # FIXME HACK jointly change as d2s
+test_predictions = preds_raw[preds_raw.task == 'd2s']
 test_predictions 
 # %%
 compute_rouge = lambda x,y: rouge.compute(references=[x], predictions=[y], use_stemmer=False, use_aggregator=False)
@@ -108,8 +108,7 @@ scores_df.describe()
 # %%
 scores_df.to_pickle(OUTPUT_PATH / "d2s_scores.pkl")
 # %%
-# MISNOMER HACK - 
-test_predictions  = preds_raw[preds_raw.task == 'd2s'] # FIXME HACK switch to s2d
+test_predictions  = preds_raw[preds_raw.task == 's2d']
 # %%
 # define set notion of precision when multiple labels are assigned
 # to a single instance, with epsilon preventing div by zero
