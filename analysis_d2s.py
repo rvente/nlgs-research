@@ -30,7 +30,7 @@ dspl_html = lambda x: display_html(x, raw=True)
 rouge = load('rouge')
 # %%
 root_path = Path("/home/vente/repos/nlgs-research")
-pkl = list((root_path / "pipeline/predictions").glob("*d2s*"))[1]
+pkl = list((root_path / "pipeline/predictions").glob("*d2s*"))[0]
 pkl.name
 # %%
 OUTPUT_PATH = root_path / "pipeline/scores" / pkl.name.removesuffix(".pkl")
@@ -68,7 +68,7 @@ rouge_scores.describe()
 # %%
 bleu = load('sacrebleu')
 bleu
-compute_bleu = lambda x,y: bleu.compute(references=[x], predictions=[y])
+compute_bleu = lambda x,y: bleu.compute(references=[x], predictions=[y],lowercase=True, tokenize='intl')
 # %%
 bleu_scores = (
   chunked.starmap(compute_bleu)

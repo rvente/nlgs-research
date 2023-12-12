@@ -210,3 +210,6 @@ Quantify word overlap, generate synthetic data, train the best model with this c
 Where am i? 
 
 just training the last model before palm's various generation steps. Use bertscore similarity between subjects to determine what wikibio data to input for the weakest categories. Also generate from n-gram similarities 'astronaut' or weakest class. Just train one final model on this.
+
+
+https://stackoverflow.com/questions/8083282/how-do-i-remove-a-big-file-wrongly-committed-in-git

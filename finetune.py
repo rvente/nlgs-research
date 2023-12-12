@@ -27,7 +27,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 assert torch.cuda.is_available()
 
 NUM_TRAIN_EPOCHS = 5
-TASK = 'd2s' # 'd2s' or 's2d' or 'mt' pull from argv
+TASK = 'mt' # 'd2s' or 's2d' or 'mt' pull from argv
 MODEL_CKPNT = "t5-base" # t5-small or t5-base
 NATURAL_LANGUAGE = "nl"
 STRUCTURED_DATA = "sd"

@@ -51,7 +51,7 @@ y_pred = test_predictions.drop(columns=['input_ids','attention_mask','pred_ids',
 chunked = (
   seq(y_pred.to_dict('records'))
     .group_by(get.record_idx)
-    .map(get[1]) # focus on teh values
+    .map(get[1]) # focus on the values
     .map(lambda x: [
       seq(x).map(get.sd).map(get[7:]).to_list(),        # gather up all of the references
       seq(x).map(get.decoded).to_list()[0][7:] # and the first prediction
@@ -73,7 +73,7 @@ rouge_scores.describe()
 # %%
 bleu = load('sacrebleu')
 bleu
-compute_bleu = lambda x,y: bleu.compute(references=[x], predictions=[y])
+compute_bleu = lambda x,y: bleu.compute(references=[x], predictions=[y],lowercase=True, tokenize='intl')
 # %%
 bleu_scores = (
   chunked.starmap(compute_bleu)
