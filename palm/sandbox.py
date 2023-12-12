@@ -1,7 +1,13 @@
+# %%
 # save model outputs into running pandas df, storing all parameters of the generation
-
 import vertexai
 from vertexai.language_models import TextGenerationModel
+import pandas as pd
+from unidecode import unidecode
+
+df = pd.read_pandas("~/repos/nlgs-research/pipeline/normalized_data/wikibio.pkl")
+df
+# %%
 
 vertexai.init(project="deception-emotion", location="us-central1")
 parameters = {
@@ -25,7 +31,7 @@ Based on the example relations above, what relations are inferable from the foll
 input: Aarhus Airport\'s runway length is 2702.0.
 output: Aarhus Airport|runwayLength|2702.0 <DONE>
 
-input: Torvalds was born in Helsinki, Finland, the son of journalists Anna and Nils Torvalds,[7] the grandson of statistician Leo Törnqvist and of poet Ole Torvalds, and the great-grandson of journalist and soldier Toivo Karanko.
+input: Torvalds was born in Helsinki, Finland, the son of journalists Anna and Nils Torvalds, the grandson of statistician Leo Törnqvist and of poet Ole Torvalds, and the great-grandson of journalist and soldier Toivo Karanko.
 output: 	
 Torvalds | birthPlace | Helsinki, Finland
 Torvalds | father | Nils Torvalds

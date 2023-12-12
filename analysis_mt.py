@@ -30,8 +30,8 @@ rouge = load('rouge')
 # %%
 root_path = Path("/home/vente/repos/nlgs-research")
 
-pkl = max( (root_path / "pipeline/predictions").glob("*mt*"))
-pkl.name
+pkl = list((root_path / "pipeline/predictions").glob("*mt*"))[1]
+pkl
 # %%
 OUTPUT_PATH = root_path / "pipeline/scores" / pkl.name.removesuffix(".pkl")
 OUTPUT_PATH.mkdir(exist_ok=True)
@@ -108,6 +108,27 @@ scores_df.describe()
 # %%
 scores_df.to_pickle(OUTPUT_PATH / "d2s_scores.pkl")
 # %%
+scores_df = pd.read_pickle(OUTPUT_PATH / "d2s_scores.pkl")
+scores_df 
+# %%
+model_predictions = chunked.to_pandas()
+model_predictions.columns = ['references','predictions']
+joint_table = pd.concat([scores_df, model_predictions], axis=1)
+worst_preds = joint_table.sort_values(by='bleu_bp').head(20)
+worst_preds['palatul_count'] = worst_preds.predictions.map(lambda x: str(x.count("Palatul") ))
+worst_preds['predictions'] = worst_preds.predictions.map(lambda x: x.replace("Palatul", "") )
+pd.set_option('display.max_colwidth', None)
+dspl_html(worst_preds[['predictions', 'palatul_count']]
+            .applymap(lambda x: x[:240])
+            # .to_html(index=False)
+            .to_latex(index=False, multirow=True)
+)
+# %%
+dspl_html(worst_preds[['references','predictions', 'palatul_count']]
+            .applymap(lambda x: x[:240])
+            .to_html(index=False)
+)
+# %%
 test_predictions  = preds_raw[preds_raw.task == 's2d']
 # %%
 # define set notion of precision when multiple labels are assigned
@@ -137,7 +158,7 @@ norm_split_set = lambda x: (
   x.str.upper()
   .str.replace("'", '')
   .str.replace(' ','')
-  .str.replace("D2S\d:", "")
+  .str.replace("S2D\d:", "")
   .map(_.split(";")).map(set)
 )
 y_pred = norm_split_set(test_predictions.decoded)
@@ -156,8 +177,7 @@ def compute_closest_edit_dists(y_pred, y_true):
       seq(y_pred)
         .cartesian(y_true)
         .starmap(edit_distance) 
-        .sorted()
-        # full penalty for missed guesses or too many guesses
+        .sorted() # full penalty for missed guesses or too many guesses
         .to_list()
     )
 
@@ -220,9 +240,7 @@ ax = (
     .map(lambda x: (x // 10) * 10)
     .map(lambda x: "[" + str(int(x)) + ", " + str(int(x+10)) + ")")
     .value_counts()
-  # .plot.bar()
 )
-# ax.set_yscale('log')
 print(ax.to_latex())
 print(ax.to_markdown())
 # %%

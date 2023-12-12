@@ -35,7 +35,7 @@ INPUT_TO_ANALYSE = ""
 
 # TODO: get this file form argv so driver code can run all analyses in a loop
 # or just analayse the outputs of the best model...?
-pkl = max( (root_path / "pipeline/predictions").glob("*s2d*"))
+pkl = list( (root_path / "pipeline/predictions").glob("*s2d*"))[1]
 pkl.name
 # %%
 OUTPUT_PATH = Path("/home/vente/repos/nlgs-research/pipeline/scores") / pkl.name.removesuffix(".pkl")
@@ -55,9 +55,9 @@ test_predictions = pd.read_pickle(pkl)
 # TP <- PRED `intersect` GT |> length
 # FP <- GT - PRED |> length
 # FN <- PRED - GT |> length  
-# F1 <- harmonic_mean(prec, recl)  
 # prec <- TP / (TP + FP)  
 # recl <- TP / (TP + FN)  
+# F1 <- harmonic_mean(prec, recl)  
 # ```
 # %%
 # define set notion of precision when multiple labels are assigned

@@ -1,0 +1,81 @@
+# %%
+from pathlib import Path
+from datasets import load_dataset
+from evaluate import load
+import pandas as pd
+import numpy as np
+from pathlib import Path
+from functional import seq
+from funcutils import underscore as _
+from funcutils import get
+from IPython.display import display, display_html, HTML
+from editdistance import distance as edit_distance
+
+import matplotlib.pyplot as plt
+from transformers import AutoTokenizer
+plt.style.use('seaborn-v0_8-whitegrid')
+params = {"ytick.color" : "black",
+          "xtick.color" : "black",
+          "axes.labelcolor" : "black",
+          "axes.edgecolor" : "black",
+          "text.usetex" : True,
+          "font.family" : "serif",
+          "font.serif" : ["Computer Modern Serif"]}
+plt.rcParams.update(params)
+
+# model_checkpoint = "t5-small"
+# tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
+# %%
+
+# %%
+df = pd.read_pickle('pipeline/normalized_data/webnlg_raw.pkl')
+
+
+df['lex_char_len'] = df.nl.map(lambda x: " ".join(x)).str.len()
+df['rdf_char_len'] = df.sd.map(lambda x: " ".join(x)).str.len()
+# %%
+df.describe().round(2)
+# %%
+print(
+    df.category.value_counts().to_latex()
+)
+# %%
+label_dist = df.sd.map(lambda x: ";".join(x)).map(_.split("|")).map(get[1])
+label_dist.value_counts().hist()
+label_dist.value_counts()
+# %%
+counts_alone = label_dist.value_counts().values
+# %%
+
+# Function x**(1/2)
+def forward(x):
+    return x**(1/2)
+
+
+def inverse(x):
+    return x**2
+ax = plt.hist(counts_alone, bins=100, density=False)
+plt.xlabel('Label Occurrences')
+plt.ylabel('Frequency')
+# plt.xscale('function', functions=(np.exp, np.log))
+# plt.yscale('function', functions=(np.exp, np.log))
+plt.yscale('log')
+# ax.set_yscale('function', functions=(forward, inverse))
+
+# ax.set_xlim([1, 180])
+
+# %%
+# %%
+wb = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/wikibio.pkl").sample(4000)
+wb['char_len'] = wb.target_text.str.len()
+wb.target_text = wb.target_text.str.replace("-lrb-", "(").str.replace("-rrb-", ")")
+wb.target_text 
+# %%
+wb.describe().round(2)
+
+wb[wb.char_len > 100][wb.char_len < 400].iloc[-1].target_text
+# %%
+from evaluate import load
+
+bertscore = load('bertscore')
+compute_bert = lambda x,y: bertscore.compute(predictions=[y], references=[x], lang="en", model_type="distilbert-base-uncased" )

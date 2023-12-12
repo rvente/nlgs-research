@@ -47,6 +47,9 @@ sd = df_raw.modified_triple_sets.map(get.mtriple_set).map(get[0])
 sdl = sd.map(len)
 display(sd)
 display(sdl)
+df['nl'] = nl
+df['sd'] = sd
+df.to_pickle("pipeline/normalized_data/webnlg_raw.pkl")
 # %%
 # normalized structured data
 def normalize_terms(rdf_triples: list[str]):
@@ -104,4 +107,22 @@ df.nl
 df
 # %%
 df.to_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
+# %%
+
+from datasets import load_dataset
+
+dataset = load_dataset("wiki_bio")
+# %%
+df_raw = pd.concat([
+        pd.concat([
+            pd.DataFrame(dataset[e]),
+            pd.DataFrame([e] * len(dataset[e]), columns=['subset'])
+        ], axis=1)
+        for e in ['val','train','test'] 
+    ],
+    axis=0)
+
+df_raw = df_raw.reset_index()
+# %%
+df_raw[['subset','target_text']].to_pickle('pipeline/normalized_data/wikibio.pkl')
 # %%

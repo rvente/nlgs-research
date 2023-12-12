@@ -30,7 +30,7 @@ dspl_html = lambda x: display_html(x, raw=True)
 rouge = load('rouge')
 # %%
 root_path = Path("/home/vente/repos/nlgs-research")
-pkl = max( (root_path / "pipeline/predictions").glob("*d2s*"))
+pkl = list((root_path / "pipeline/predictions").glob("*d2s*"))[1]
 pkl.name
 # %%
 OUTPUT_PATH = root_path / "pipeline/scores" / pkl.name.removesuffix(".pkl")
@@ -96,10 +96,30 @@ all_scores = (
     .zip(['bert','bleu','rouge'])
     .starmap(prepend_name_to_cols)
 )
+unflt = pd.DataFrame(chunked, columns=['references','predictions'])
 scores_df = pd.concat(all_scores, axis=1)
 scores_df
+# %%
+scores_preds = pd.concat([scores_df,unflt], axis=1)
+scores_preds 
 # %%
 scores_df.describe()
 # %%
 scores_df.to_pickle(OUTPUT_PATH / "d2s_scores.pkl")
+# %%
+scores_df.sort_values(by='bleu_score')
+# %%
+scores_preds.sort_values(by='bleu_score')
+
+# %%
+zero_bleus = scores_preds[scores_preds.bleu_score == 0]
+zero_bleus
+# %%
+zero_bleus.shape
+# %%
+scores_preds.bleu_score.hist()
+scores_preds.bert_f1.hist()
+# %%
+scores_preds.rouge_rougeL.hist()
+
 # %%
