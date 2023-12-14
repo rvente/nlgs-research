@@ -46,7 +46,7 @@ OUTPUT_PATH
 # %%
 test_predictions = pd.read_pickle(pkl)
 is_mt = False
-if 'task' in test_predictions.columns:
+if 'mt' in pkl.name:
   test_predictions = test_predictions[test_predictions.task == 'd2s']
   is_mt = True
 test_predictions
