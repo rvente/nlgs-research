@@ -28,7 +28,7 @@ assert torch.cuda.is_available()
 
 NUM_TRAIN_EPOCHS = 5
 TASK = 'mt' # 'd2s' or 's2d' or 'mt' pull from argv
-MODEL_CKPNT = "t5-base" # t5-small or t5-base
+MODEL_CKPNT = "t5-small" # t5-small or t5-base
 NATURAL_LANGUAGE = "nl"
 STRUCTURED_DATA = "sd"
 LR = 2.0e-4
@@ -71,7 +71,7 @@ args = Seq2SeqTrainingArguments(
     learning_rate=LR,
     per_device_train_batch_size=batch_size,
     per_device_eval_batch_size=batch_size//2,
-    gradient_accumulation_steps=2, # so we have an effective batch size of 32
+    gradient_accumulation_steps=2 if MODEL_CKPNT != 't5-small' else 1, # so we have an effective batch size of 32
     weight_decay=0.01,
     save_total_limit=5,
     num_train_epochs=NUM_TRAIN_EPOCHS,

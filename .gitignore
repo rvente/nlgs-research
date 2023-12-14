@@ -1,3 +1,4 @@
 models/
 wikibio.pkl
 mt-t5-base-5.pkl
+__pycache__/

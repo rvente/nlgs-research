@@ -66,16 +66,54 @@ plt.yscale('log')
 
 # %%
 # %%
-wb = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/wikibio.pkl").sample(4000)
+wb = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/wikibio.pkl").sample(8000)
 wb['char_len'] = wb.target_text.str.len()
-wb.target_text = wb.target_text.str.replace("-lrb-", "(").str.replace("-rrb-", ")")
+wb.target_text = (
+    wb.target_text
+    .str.replace("-lrb- ", "(")
+    .str.replace(" -rrb-", ")")
+    .str.replace(" ,", ",")
+)
 wb.target_text 
 # %%
 wb.describe().round(2)
 
-wb[wb.char_len > 100][wb.char_len < 400].iloc[-1].target_text
+print(wb[wb.char_len > 100][wb.char_len < 500].iloc[-1].target_text)
+wb[wb.char_len > 100][wb.char_len < 500]
 # %%
 from evaluate import load
 
 bertscore = load('bertscore')
 compute_bert = lambda x,y: bertscore.compute(predictions=[y], references=[x], lang="en", model_type="distilbert-base-uncased" )
+
+# %%
+preds = pd.read_pickle("~/repos/nlgs-research/pipeline/predictions/mt-t5-base-5.pkl")
+scores = pd.read_pickle("~/repos/nlgs-research/pipeline/scores/mt-t5-base-5/d2s_scores.pkl")
+scores
+# %%
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import cm
+
+X = scores.bert_f1
+Y = scores.bleu_score
+Z = scores.bleu_sys_len
+
+
+fig = plt.figure()
+
+cmap = cm.get_cmap('coolwarm')
+color = cmap(Z)[..., :3]
+
+ax = plt.scatter(X,Y,c=color)
+plt.xlabel('BERTScore')
+plt.ylabel('BLEU')
+from scipy.stats.stats import pearsonr   
+pearsonr(X, Y)
+# %%
+ax = plt.scatter(X,Z,c=color)
+plt.xlabel('BERTScore')
+plt.ylabel('Length')
+pearsonr(X,Z)
+
+# %%

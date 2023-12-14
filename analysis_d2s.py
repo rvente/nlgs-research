@@ -11,6 +11,7 @@ from funcutils import underscore as _
 from funcutils import get
 from IPython.display import display, display_html, HTML
 from editdistance import distance as edit_distance
+from sys import argv
 
 import matplotlib.pyplot as plt
 # %%
@@ -29,28 +30,54 @@ plt.rcParams.update(params)
 dspl_html = lambda x: display_html(x, raw=True)
 rouge = load('rouge')
 # %%
+index = int(argv[1]) if len(argv) == 2 and argv[1].isnumeric() else 0
+print(index)
+
 root_path = Path("/home/vente/repos/nlgs-research")
-pkl = list((root_path / "pipeline/predictions").glob("*d2s*"))[0]
-pkl.name
+pkl = (
+  list( (root_path / "pipeline/predictions").glob("*d2s*")) +
+  list( (root_path / "pipeline/predictions").glob("*mt*" ))
+)[index]
+print(pkl.name)
 # %%
 OUTPUT_PATH = root_path / "pipeline/scores" / pkl.name.removesuffix(".pkl")
 OUTPUT_PATH.mkdir(exist_ok=True)
 OUTPUT_PATH
 # %%
 test_predictions = pd.read_pickle(pkl)
+is_mt = False
+if 'task' in test_predictions.columns:
+  test_predictions = test_predictions[test_predictions.task == 'd2s']
+  is_mt = True
+test_predictions
 # %%
 compute_rouge = lambda x,y: rouge.compute(references=[x], predictions=[y], use_stemmer=False, use_aggregator=False)
 compute_rouge(["general kenobi"], "general kenobi")
-y_pred = test_predictions.drop(columns=['input_ids','attention_mask','pred_ids','labels'])
+y_pred = (
+  test_predictions.drop(columns=['input_ids','attention_mask','pred_ids','labels'])
+)
+
+# we trained record by record but are evalating by test index,
+# so chunk up the indices as appropriate
+
+def conditional_cleaning(x):
+  if is_mt:
+    lead_trim = 7 # remove "d2s 0:" string identifier from start
+    return [
+      seq(x).map(get.sd).map(lambda x: x[lead_trim:]).to_list(),
+      seq(x).map(get.decoded).to_list()[0][lead_trim:]
+    ]
+  else:
+    return [
+      seq(x).map(get.nl).to_list(),        # gather up all of the references
+      seq(x).map(get.decoded).to_list()[0] # and the first prediction
+    ]
 
 chunked = (
   seq(y_pred.to_dict('records'))
     .group_by(get.record_idx)
     .map(get[1]) # focus on teh values
-    .map(lambda x: [
-      seq(x).map(get.nl).to_list(),        # gather up all of the references
-      seq(x).map(get.decoded).to_list()[0] # and the first prediction
-    ])
+    .map(conditional_cleaning)
 )
 chunked
 # %%
@@ -105,6 +132,7 @@ scores_preds
 # %%
 scores_df.describe()
 # %%
+scores_df.to_csv(OUTPUT_PATH / "d2s_scores.csv")
 scores_df.to_pickle(OUTPUT_PATH / "d2s_scores.pkl")
 # %%
 scores_df.sort_values(by='bleu_score')
@@ -118,8 +146,20 @@ zero_bleus
 zero_bleus.shape
 # %%
 scores_preds.bleu_score.hist()
+plt.title("Distribution of BLEU Scores")
+plt.xlabel("BLEU Scores")
+plt.ylabel("Count")
+plt.savefig(OUTPUT_PATH/'bleu_score_dist.svg')
+# %%
 scores_preds.bert_f1.hist()
+plt.title("Distribution of BERTScores")
+plt.xlabel("BERTScore")
+plt.ylabel("Count")
+plt.savefig(OUTPUT_PATH/'bertscore_dist.svg')
 # %%
 scores_preds.rouge_rougeL.hist()
-
+plt.title("Distribution of RougeL Scores")
+plt.xlabel("Rouge LCS Score")
+plt.ylabel("Count")
+plt.savefig(OUTPUT_PATH/'rouge_dist.svg')
 # %%
