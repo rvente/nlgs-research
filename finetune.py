@@ -27,6 +27,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 assert torch.cuda.is_available()
 
 NUM_TRAIN_EPOCHS = 5
+IS_MULTI_CORPUS = True
 TASK = 'mt' # 'd2s' or 's2d' or 'mt' pull from argv
 MODEL_CKPNT = "t5-small" # t5-small or t5-base
 NATURAL_LANGUAGE = "nl"
@@ -118,6 +119,9 @@ def compute_metrics(eval_pred):
 # END: COPIED FROM https://huggingface.co/docs/transformers/tasks/summarization
 # %%
 df = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
+
+if IS_MULTI_CORPUS:
+    df = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_wikibio_joint.pkl")
 df
 # %% [markdown]
 # we must invent `seed_number` since d2s can output multiple sentences for the
@@ -159,6 +163,10 @@ flt
 if (TASK == "mt") and has_not_run:
     has_not_run = False
     flt['sd'] = flt.task + flt.seed_number.map(lambda x: " " + str(x) + ": ") + flt.sd
+
+    # allow the model to code switch between corpora
+    if IS_MULTI_CORPUS:
+        flt['sd'] = flt.category.map(lambda x: 'wb' if x == 'WikiBio' else "") + flt.sd
 flt
 # %%
 tokenized = tokenize(list(flt[INPUT].values))
@@ -173,9 +181,12 @@ flt['attention_mask'] = tokenized['attention_mask']
 flt['labels'] = flt[TARGET].map(lambda x: tokenize(x)['input_ids'])
 flt['input_ids'].map(len)
 # %%
+flt
+# %%
 # this will keep only the needed fields in memory on the GPU
 def pd_to_dataset(df: pd.DataFrame, split='train') -> Dataset:
-    d = df[df.subset== split ][['input_ids','attention_mask','labels']]
+    print(df)
+    d = df[df.subset== split][['input_ids','attention_mask','labels']]
     return Dataset.from_pandas(d)
         
 # get_ds alias should bake in the desired argument. Makes you wish python
@@ -183,6 +194,7 @@ def pd_to_dataset(df: pd.DataFrame, split='train') -> Dataset:
 get_ds = lambda x: pd_to_dataset(flt, x)
 tds = get_ds('train')
 eds = get_ds('dev')
+tds
 # %%
 trainer = Seq2SeqTrainer(
     model,
@@ -203,7 +215,8 @@ except ValueError as e:
     print(e)
     trainer.train()
 # %%
-trainer.push_to_hub()
+if False:
+    trainer.push_to_hub()
 # %%
 try:
     del tds

@@ -1,3 +1,8 @@
+"""
+This file preprocesses raw corpora and emits clean versions of them to `normalized_data`
+
+
+"""
 # %%
 import functools
 import operator as op
@@ -18,7 +23,8 @@ from unidecode import unidecode
 
 from funcutils import get
 from funcutils import underscore as _
-
+from pathlib import Path
+import ast
 # %%
 # import webnlg 2.0
 raw_datasets = load_dataset("web_nlg", "release_v2")
@@ -49,7 +55,7 @@ display(sd)
 display(sdl)
 df['nl'] = nl
 df['sd'] = sd
-df.to_pickle("pipeline/normalized_data/webnlg_raw.pkl")
+# df.to_pickle("pipeline/normalized_data/webnlg_raw.pkl")
 # %%
 # normalized structured data
 def normalize_terms(rdf_triples: list[str]):
@@ -75,7 +81,7 @@ def normalize_terms(rdf_triples: list[str]):
         .map(unidecode)
     )
 
-
+# %%
 nsd = sd.map(normalize_terms).map(lambda x: "; ".join(x))
 nsd
 # %%
@@ -99,14 +105,14 @@ assert freq >= len(counts.values)
 df['sd'] = nsd
 df.sd
 # %%
-# normalize by removing ascii
+# normalize by removing non-ascii
 nnl = nl.map(lambda x: seq(x).map(unidecode).to_list())
 df['nl'] = nnl
 df.nl
 # %%
 df
 # %%
-df.to_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
+# df.to_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
 # %%
 
 from datasets import load_dataset
@@ -124,5 +130,76 @@ df_raw = pd.concat([
 
 df_raw = df_raw.reset_index()
 # %%
-df_raw[['subset','target_text']].to_pickle('pipeline/normalized_data/wikibio.pkl')
+# df_raw[['subset','target_text']].to_pickle('pipeline/normalized_data/wikibio.pkl')
+# %%
+palm_outputs = pd.Series(Path('palm/generations/').glob("*"))
+# %%
+palm_raw_text = palm_outputs.map(_.read_text())
+palm_raw_text 
+# %%
+# %%
+def parse_store_errors(string):
+    def get_within(tag):
+        tagopen = f"<{tag}>"
+        idst = string.find(tagopen)
+        ided = string.find(f"</{tag}>")
+        return string[idst + len(tagopen): ided].strip()
+    try:
+        if not 'sentence' in string or not 'labels' in string:
+            print(string)
+            return None
+        ident,sent,labls = (get_within('id'), get_within('sentence'), get_within('labels'))
+        
+        parsed_labels = ast.literal_eval(labls)
+        return ident,sent, ";".join(normalize_terms(parsed_labels))
+
+    except Exception as e:
+        print(e)
+        return None
+        
+parsed = palm_raw_text.map(parse_store_errors)
+print(Counter(parsed).most_common(3))
+print(parsed.size)
+parsed
+# %%
+valids = seq(parsed).filter(lambda x: x!= None)
+indices = valids.map(get[0]).map(int).map(lambda x: x*100000)
+sentences = (
+  valids
+    .map(get[1]) # the sentence is the first arg
+    .map(unidecode) # clean out unicode chars
+    .zip(indices)   # maintain the index
+    .starmap(lambda x,y: (y,x)) # prepare for joining
+)
+sentences 
+# %%
+data_triples = (
+  valids
+    .map(get[2])
+    .map(unidecode)
+    .map(_.replace(" | ", '|'))
+    .zip(indices)
+    .starmap(lambda x, y: (y,x))
+)
+data_triples 
+# %%
+# %%
+wikibio_joined = sentences.join(data_triples).to_pandas(columns=['index','joined']) # execute the join
+wikibio_joined['category'] = 'WikBio'
+wikibio_joined['subset'] = 'train'
+wikibio_joined['sd'] = wikibio_joined.joined.map(get[1])
+wikibio_joined['nl'] = wikibio_joined.joined.map(get[0]).map(lambda x: [x])
+wikibio  = wikibio_joined.drop(columns=['joined'])
+wikibio
+# %%
+wikibio.to_pickle("~/repos/nlgs-research/pipeline/normalized_data/wikibio_llm_annot.pkl")
+wikibio
+# %%
+webnlg = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_clean.pkl")
+webnlg
+# %%
+joint_corpus = pd.concat([webnlg, wikibio]).sample(frac=1.0)
+joint_corpus 
+# %%
+joint_corpus.to_pickle("~/repos/nlgs-research/pipeline/normalized_data/webnlg_wikibio_joint.pkl")
 # %%

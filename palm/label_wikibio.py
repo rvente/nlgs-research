@@ -74,7 +74,7 @@ def retrieve_generation(text, i):
 # %%
 
 if __name__ == "__main__":
-    df = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/wikibio.pkl").head(1000)
+    df = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/wikibio.pkl").head(5000)
     res = seq(df.target_text).zip(df.index).starmap(retrieve_generation)
     print(res)
 # %%
