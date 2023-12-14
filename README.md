@@ -4,6 +4,7 @@
 
 <details>
   <summary>Code Structure</summary>
+
 ```
 ├── README.md
 ├── analysis_d2s.py # data to sentence evaluation
@@ -47,6 +48,7 @@
 │           └── analysis_s2d.ipynb
 └── funcutils.py
 ```
+
 </details>
 
 
