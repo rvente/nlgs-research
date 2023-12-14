@@ -202,7 +202,8 @@ try:
 except ValueError as e:
     print(e)
     trainer.train()
-
+# %%
+trainer.push_to_hub()
 # %%
 try:
     del tds

@@ -28,7 +28,7 @@ dspl_html = lambda x: display_html(x, raw=True)
 rouge = load('rouge')
 print(argv)
 # %%
-index = int(argv[1]) if len(argv) == 2 else 0
+index = int(argv[1]) if len(argv) == 2 and argv[1].isnumeric() else 1
 root_path = Path("/home/vente/repos/nlgs-research")
 pkl = (
   list( (root_path / "pipeline/predictions").glob("*s2d*")) +
@@ -154,15 +154,20 @@ print(len(worst_finishes))
 results[['med_scores','f1_scores']].describe()
 # %%
 results.f1_scores.hist(bins=15)
+plt.title("$F_1$ Score Distribution")
 plt.xlabel("$F_1$ Score")
 plt.ylabel("Count")
 plt.savefig(OUTPUT_PATH/'f1_hist.svg')
+# %%
+plt.clf()
 # %%
 worst_finishes.med_scores.hist(bins=15)
 plt.title("Edit Distances Among Predictions With $F_1$ score of 0.0")
 plt.xlabel("Edit Distances")
 plt.ylabel("Count")
 plt.savefig(OUTPUT_PATH/'edit_dist.svg')
+# %%
+plt.clf()
 # %%
 # sparse-bar formation of the same histogram data
 ax = (
@@ -180,9 +185,11 @@ worst_finishes.category.value_counts().plot.bar()
 plt.savefig(OUTPUT_PATH/'worst_finishes_cats.svg')
 # %%
 # normalized performance by category
+plt.clf()
 corpus = pd.read_pickle(root_path/'pipeline/normalized_data/webnlg_clean.pkl')
 train_corpus = corpus[corpus.subset == 'train']
 train_corpus.category.value_counts().plot.bar()
+plt.clf()
 # %%
 npc = worst_finishes.category.value_counts() / train_corpus.category.value_counts()
 npc.sort_values().plot.bar()
@@ -190,6 +197,7 @@ plt.title("$F_1 = 0$ by Training Category")
 plt.ylabel("Fraction of Training Samples")
 plt.savefig(OUTPUT_PATH/'normalized_performance_by_cat.svg')
 # %%
+plt.clf()
 worst_finishes.sort_values(by=['med_scores'])
 # %%
 results[['med_scores','record_idx','f1_scores']].to_csv(OUTPUT_PATH/'results.csv')

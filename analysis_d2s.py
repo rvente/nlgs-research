@@ -151,15 +151,21 @@ plt.xlabel("BLEU Scores")
 plt.ylabel("Count")
 plt.savefig(OUTPUT_PATH/'bleu_score_dist.svg')
 # %%
+plt.clf()
+# %%
 scores_preds.bert_f1.hist()
 plt.title("Distribution of BERTScores")
 plt.xlabel("BERTScore")
 plt.ylabel("Count")
 plt.savefig(OUTPUT_PATH/'bertscore_dist.svg')
 # %%
+plt.clf()
+# %%
 scores_preds.rouge_rougeL.hist()
 plt.title("Distribution of RougeL Scores")
 plt.xlabel("Rouge LCS Score")
 plt.ylabel("Count")
 plt.savefig(OUTPUT_PATH/'rouge_dist.svg')
+# %%
+plt.clf()
 # %%

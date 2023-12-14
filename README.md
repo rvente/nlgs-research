@@ -1,5 +1,19 @@
 # README
 
+A variant of the models trained is published here
+
+One may prompt it with 
+
+`s2d 0:  Torvalds was born in Helsinki, Finland, the son of journalists Anna and Nils Torvalds`
+
+or
+
+`d2s 0: Torvalds|birth place|Finland;` 
+
+and should obtain sensible output generations.
+
+https://huggingface.co/vente/t5-small-finetuned-webnlg-mt-2.0e-04
+
 ## Structure
 
 <details>
