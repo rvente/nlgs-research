@@ -16,6 +16,16 @@ https://huggingface.co/vente/t5-small-finetuned-webnlg-mt-2.0e-04
 
 ## Structure
 
+1. Data downloading is taken care of by the hugging face datasets library
+  - `preproc.py` should run first to clean the data (preprocessing)
+2. Training baselines and experiments is controlled by the global variables
+   at the top of `finetune.py`
+   - reads the data emitted from preprocessing.py and trains on them
+3. By changing the global vars and running `finetune.py` again
+4. Scoring the model has the `analysis_*.py` and is partitioned by sub-task
+
+## Structure
+
 <details>
   <summary>Code Structure</summary>
 
@@ -24,8 +34,8 @@ https://huggingface.co/vente/t5-small-finetuned-webnlg-mt-2.0e-04
 ├── analysis_d2s.py # data to sentence evaluation
 ├── analysis_mt.py  # multi-task evaluation
 ├── analysis_s2d.py # sentence to data evaluation
-├── anaysis_corpus.py 
-├── finetune.py # trains the networks, saving results in models/ outputting 
+├── anaysis_corpus.py # compute corpus statistics
+├── finetune.py # trains the networks, saving results in models/ outputting predictions to pipelines/predictions
 ├── preproc.py
 ├── cuda-envs
 │   ├── base_requirements.txt
@@ -38,9 +48,6 @@ https://huggingface.co/vente/t5-small-finetuned-webnlg-mt-2.0e-04
 ├── pipeline
 │   ├── anaysis_corpus.py    # pre-midterm analysis including plots
 │   ├── normalized_data      # store and reuse raw and pre-processed versions of the corpora
-│   │   ├── webnlg_clean.pkl
-│   │   ├── webnlg_raw.pkl
-│   │   └── wikibio.pkl
 │   ├── figs # stores the figures emitted by the analysis_corpus.py
 │   │   ├── box_plot_datacounts.pdf
 │   │   ├── [...]
@@ -49,18 +56,11 @@ https://huggingface.co/vente/t5-small-finetuned-webnlg-mt-2.0e-04
 │   │   ├── d2s-t5-base-5.pkl
 │       ├── [...]
 │   │   └── s2d-t5-small-5.pkl
-│   └── scores # better named logs, is where intermediate files are saved
-│       ├── d2s-t5-base-5
-│       │   ├── analysis_d2s.ipynb
-│       │   ├── d2s_scores.pkl
-│       │   └── finetune.ipynb
-│       ├── [...]
+│   └── scores # plots, and score csv's are output here by model
+│       ├── d2s-t5-base-5  # some logs are also provided
 │       ├── s2d-t5-base-5
-│       │   ├── analysis_s2d.ipynb
-│       │   └── finetune.ipynb
 │       └── s2d-t5-small-5
-│           └── analysis_s2d.ipynb
-└── funcutils.py
+└── funcutils.py # a bespoke small library I wrote for convenience functions
 ```
 
 </details>
