@@ -1,5 +1,5 @@
-# %%
 # this file takes in all files and produce the appropriate d2s analysis
+# %%
 from pathlib import Path
 from datasets import load_dataset
 from evaluate import load
@@ -30,7 +30,7 @@ plt.rcParams.update(params)
 dspl_html = lambda x: display_html(x, raw=True)
 rouge = load('rouge')
 # %%
-index = int(argv[1]) if len(argv) == 2 and argv[1].isnumeric() else 0
+index = int(argv[1]) if len(argv) == 2 and argv[1].isnumeric() else 2
 print(index)
 
 root_path = Path("/home/vente/repos/nlgs-research")
@@ -168,4 +168,13 @@ plt.ylabel("Count")
 plt.savefig(OUTPUT_PATH/'rouge_dist.svg')
 # %%
 plt.clf()
+# %%
+bad_bleus = scores_df[scores_df.bleu_score < 15]
+bad_bleus.describe()
+# %%
+score_pred = chunked.to_pandas()
+print(
+  score_pred[scores_df.bleu_score < 15][:10]
+  .to_markdown()
+)
 # %%

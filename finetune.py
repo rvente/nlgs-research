@@ -32,11 +32,13 @@ TASK = 'mt' # 'd2s' or 's2d' or 'mt' pull from argv
 MODEL_CKPNT = "t5-small" # t5-small or t5-base
 NATURAL_LANGUAGE = "nl"
 STRUCTURED_DATA = "sd"
+MULTI_CORP = '-multicorp' if IS_MULTI_CORPUS else ""
 LR = 2.0e-4
-TRAIN_CHKPNT_NAME = f"models/{MODEL_CKPNT}-finetuned-webnlg-{TASK}-{LR:.1e}"
+TRAIN_CHKPNT_NAME = f"models/{MODEL_CKPNT}-finetuned-webnlg-{TASK}-{LR:.1e}{MULTI_CORP}"
 
 TARGET = NATURAL_LANGUAGE if TASK == 'd2s' else STRUCTURED_DATA 
 INPUT = STRUCTURED_DATA if TASK == 'd2s' else NATURAL_LANGUAGE 
+TRAIN_CHKPNT_NAME
 # %% unbind the variables
 assert TARGET != INPUT
 del NATURAL_LANGUAGE
@@ -242,7 +244,7 @@ test_set['pred_ids'] = list(pred_df['pred_ids'].values)
 test_set['decoded'] = list(pred_df['decoded'].values)
 test_set
 # %%
-save_fname = f"~/repos/nlgs-research/pipeline/predictions/{TASK}-{MODEL_CKPNT}-{NUM_TRAIN_EPOCHS}.pkl"
+save_fname = f"~/repos/nlgs-research/pipeline/predictions/{TASK}-{MODEL_CKPNT}-{NUM_TRAIN_EPOCHS}{MULTI_CORP}.pkl"
 test_set.to_pickle(save_fname)
 save_fname
 # %% [markdown]

@@ -2,5 +2,6 @@ models/
 wikibio.pkl
 webnlg_wikibio_joint.pkl
 mt-t5-base-5.pkl
+mt-t5-small-5-multicorp.pkl
 __pycache__/
 generations/
