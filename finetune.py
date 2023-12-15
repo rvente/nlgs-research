@@ -29,7 +29,7 @@ assert torch.cuda.is_available()
 NUM_TRAIN_EPOCHS = 5
 IS_MULTI_CORPUS = True
 TASK = 'mt' # 'd2s' or 's2d' or 'mt' pull from argv
-MODEL_CKPNT = "t5-small" # t5-small or t5-base
+MODEL_CKPNT = "t5-base" # t5-small or t5-base
 NATURAL_LANGUAGE = "nl"
 STRUCTURED_DATA = "sd"
 MULTI_CORP = '-multicorp' if IS_MULTI_CORPUS else ""

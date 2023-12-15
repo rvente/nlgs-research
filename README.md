@@ -94,8 +94,7 @@ python3 -c "import torch; print(torch.cuda.is_available()); print(torch.__versio
 
 ### Useful Commands
 
-One might accidentally commit one of the larger pickle files. For example `mt-t5-base-5.pkl` was committed because
-it generated output that was too long and over the 10MB limit. 
+One might accidentally commit one of the larger pickle files. For example `mt-t5-base-5.pkl` was committed because it generated output that was too long and over the 10MB limit. 
 
 https://stackoverflow.com/questions/8083282/how-do-i-remove-a-big-file-wrongly-committed-in-git
 

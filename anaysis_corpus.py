@@ -23,9 +23,6 @@ params = {"ytick.color" : "black",
           "font.serif" : ["Computer Modern Serif"]}
 plt.rcParams.update(params)
 
-# model_checkpoint = "t5-small"
-# tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-# %%
 
 # %%
 df = pd.read_pickle('pipeline/normalized_data/webnlg_raw.pkl')
@@ -57,13 +54,7 @@ def inverse(x):
 ax = plt.hist(counts_alone, bins=100, density=False)
 plt.xlabel('Label Occurrences')
 plt.ylabel('Frequency')
-# plt.xscale('function', functions=(np.exp, np.log))
-# plt.yscale('function', functions=(np.exp, np.log))
 plt.yscale('log')
-# ax.set_yscale('function', functions=(forward, inverse))
-
-# ax.set_xlim([1, 180])
-
 # %%
 # %%
 wb = pd.read_pickle("~/repos/nlgs-research/pipeline/normalized_data/wikibio.pkl").sample(8000)
@@ -116,4 +107,6 @@ plt.xlabel('BERTScore')
 plt.ylabel('Length')
 pearsonr(X,Z)
 
+# %%
+preds[preds.category == 'SportsTeam'][preds.task =='d2s']
 # %%

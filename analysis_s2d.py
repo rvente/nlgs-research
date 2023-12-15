@@ -28,13 +28,14 @@ dspl_html = lambda x: display_html(x, raw=True)
 rouge = load('rouge')
 print(argv)
 # %%
-index = int(argv[1]) if len(argv) == 2 and argv[1].isnumeric() else 1
+index = int(argv[1]) if len(argv) == 2 and argv[1].isnumeric() else 2
 root_path = Path("/home/vente/repos/nlgs-research")
 pkl = (
   list( (root_path / "pipeline/predictions").glob("*s2d*")) +
   list( (root_path / "pipeline/predictions").glob("*mt*" ))
 )[index]
 print(pkl.name)
+# %%
 test_predictions = pd.read_pickle(pkl)
 if 'task' in test_predictions.columns:
   test_predictions = test_predictions[test_predictions.task == 's2d']
