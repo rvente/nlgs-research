@@ -1,6 +1,11 @@
-# README
+# Towards a bijection between prose and structured data
 
-A variant of the models trained is published here
+Graduate coursework, with the paper "Inroads to natural language structured data bijection and the role of LLM annotated data" in the `paper/` folder.
+
+See the "continue the project" section below or the "future work" in the paper for future research directions. 
+
+A variant of the models trained is published here https://huggingface.co/vente/t5-small-finetuned-webnlg-mt-2.0e-04
+
 
 One may prompt it with 
 
@@ -10,9 +15,7 @@ or
 
 `d2s 0: Torvalds|birth place|Finland;` 
 
-and should obtain sensible output generations.
-
-https://huggingface.co/vente/t5-small-finetuned-webnlg-mt-2.0e-04
+and should obtain sensible output generations. But note that the default generation settings of huggingface may be different from those used in the paper.
 
 ## Structure
 
@@ -110,3 +113,12 @@ Sources For the useful commands above
 - https://stackoverflow.com/a/48947404
 - https://stackoverflow.com/questions/41274007/anaconda-export-environment-file
 - https://stackoverflow.com/a/59456960
+
+## Continue the project
+
+This uses t5 because it's a good experimental platform because it doesn't take too long to train.
+
+Low hanging fruit for semantic parsing task
+- What if the model I trained is just too "detailed" or not "detailed" enough? Extend the scoring logic to extract true positive rate and false positive rate to see if it's being penalized for extracting too many relations (even if they are correct) 
+- How does the model perform when trained on LLM annotated wikibio data and tested on webnlg data? This would be a true test of generalization because the corpora are qualitatively different.
+- Similar to above but using templates to create fake training data. Can we extract 100 or so templates from the existing samples? How does the model fare with parsing in this case
