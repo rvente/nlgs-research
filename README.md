@@ -1,4 +1,4 @@
-# Towards a bijection between prose and structured data
+# Inroads to a Structured Data Natural Language Bijection and the role of LLM annotation
 
 Graduate coursework, with the paper "Inroads to natural language structured data bijection and the role of LLM annotated data" in the `paper/` folder.
 
@@ -6,6 +6,9 @@ See the "continue the project" section below or the "future work" in the paper f
 
 A variant of the models trained is published here https://huggingface.co/vente/t5-small-finetuned-webnlg-mt-2.0e-04
 
+Official Implementation of https://arxiv.org/abs/2401.07190
+
+A variant of the models trained is published here on HuggingFace https://huggingface.co/vente/t5-small-finetuned-webnlg-mt-2.0e-04
 
 One may prompt it with 
 
@@ -17,7 +20,7 @@ or
 
 and should obtain sensible output generations. But note that the default generation settings of huggingface may be different from those used in the paper.
 
-## Structure
+## Usage
 
 1. Data downloading is taken care of by the hugging face datasets library
   - `preproc.py` should run first to clean the data (preprocessing)
@@ -26,6 +29,19 @@ and should obtain sensible output generations. But note that the default generat
    - reads the data emitted from preprocessing.py and trains on them
 3. By changing the global vars and running `finetune.py` again
 4. Scoring the model has the `analysis_*.py` and is partitioned by sub-task
+
+## Citation
+
+```bibtex
+@misc{vente2024inroads,
+      title={Inroads to a Structured Data Natural Language Bijection and the role of LLM annotation}, 
+      author={Blake Vente},
+      year={2024},
+      eprint={2401.07190},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+```
 
 ## Structure
 
